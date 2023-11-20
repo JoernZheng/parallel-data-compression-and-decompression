@@ -50,3 +50,12 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# JetBrains
+.idea
+
+# MacOS
+.DS_Store
+
+# VSCode
+.vscode/
