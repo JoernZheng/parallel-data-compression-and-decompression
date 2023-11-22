@@ -59,3 +59,8 @@ dkms.conf
 
 # VSCode
 .vscode/
+
+# CMake
+CMakeLists.txt
+cmake-build-debug/
+
