@@ -97,23 +97,3 @@ void sort_files_by_size(const char *path) {
     }
     free(files);
 }
-
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-
-    if (world_rank == 0) {
-        if (argc < 2) {
-            printf("Usage: %s <directory path>\n", argv[0]);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-            return 1;
-        }
-        sort_files_by_size(argv[1]);
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD); // Ensuring all processes reach this point
-    MPI_Finalize();
-    return 0;
-}
