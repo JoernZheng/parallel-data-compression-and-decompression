@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <mpi.h>
+#include "process.h"
 
 #define CHUNK_SIZE 16384
 #define QUEUE_SIZE 100
@@ -15,7 +16,8 @@
 typedef struct {
     unsigned char data[CHUNK_SIZE];
     size_t size;
-    int is_last;
+    int is_last_chunk;
+    int is_last_file;
 } Chunk;
 
 typedef struct {
@@ -38,6 +40,14 @@ sem_t *sem_queue_not_full;
 sem_t *sem_queue_not_empty;
 
 int mpi_proc_size;
+int mpi_proc_rank;
+
+int max_record_line_num;
+
+// Consumer's parameters
+int final_chunk_processed = 0;
+int processed_chunk_count = 0;
+int active_consumer_count = NUM_CONSUMERS;
 
 void init_semaphores(int world_rank) {
     char sem_name_full[256];
@@ -102,11 +112,14 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
         }
 
         // Only process files that are assigned to this process
-        printf("file_number: %d, mpi_proc_size: %d, world_rank: %d\n", file_number, mpi_proc_size, world_rank);
+        // printf("file_number: %d, mpi_proc_size: %d, world_rank: %d\n", file_number, mpi_proc_size, world_rank);
         if (file_number == next_file_number) {
+            // Increment next_file_number by mpi_proc_size before processing because we need this parameter as a signal
+            // to tell the consumer that there is no more file to process when next_file_number >= max_record_line_num
+            next_file_number += mpi_proc_size;
             char full_path[1024];
             sprintf(full_path, format_string, input_dir, file_path);
-            printf("Rank: %d - Processing file: %s\n", world_rank, full_path);
+            // printf("Rank: %d - Processing file: %s\n", world_rank, full_path);
             full_path[strcspn(full_path, "\n")] = 0; // Remove trailing '\n'
 
             FILE *source = fopen(full_path, "rb");
@@ -121,8 +134,12 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
             size_t bytes_read;
             while ((bytes_read = fread(chunk.data, 1, CHUNK_SIZE, source)) > 0) {
                 chunk.size = bytes_read;
-                chunk.is_last = feof(source);
-
+                chunk.is_last_chunk = feof(source);
+                if (next_file_number >= max_record_line_num) {
+                    if (chunk.is_last_file == 0) {
+                        chunk.is_last_file = 1;
+                    }
+                }
                 sem_wait(sem_queue_not_full);
                 omp_set_lock(&queue_lock);
                 queue[queue_tail] = chunk;
@@ -130,31 +147,37 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
                 omp_unset_lock(&queue_lock);
                 sem_post(sem_queue_not_empty);
 
-                printf("Rank: %d - Produced chunk %d\n", world_rank, ++chunk_number);
+                printf("Rank: %d, Thread: %d - Produced chunk %d\n", omp_get_thread_num(), world_rank, ++chunk_number);
             }
 
             fclose(source);
-            next_file_number += mpi_proc_size;
         }
 
         file_number++;
     }
 
+    printf("Rank: %d - Total processed file: %d\n", world_rank, file_number);
+    printf("Rank: %d - Total produced chunk: %d\n", world_rank, chunk_number);
     fclose(record_file);
 }
 
-
 // Compress a chunk of data
 void consumer() {
-    int last_chunk_processed = 0;
-    while (!last_chunk_processed) {
+    while (!final_chunk_processed) {
         sem_wait(sem_queue_not_empty);
+
+        // Avoid deadlock
+        if (final_chunk_processed) {
+            break;
+        }
+
         omp_set_lock(&queue_lock);
-
         Chunk chunk = queue[queue_head];
-        last_chunk_processed = chunk.is_last; // If this is the last chunk, we will stop after processing it
+        if (chunk.is_last_file && chunk.is_last_chunk) {
+            final_chunk_processed = 1;
+            printf("Rank: %d, Thread: %d - Thread exit due to no remaining tasks\n", mpi_proc_rank, omp_get_thread_num());
+        }
         queue_head = (queue_head + 1) % QUEUE_SIZE;
-
         omp_unset_lock(&queue_lock);
         sem_post(sem_queue_not_full);
 
@@ -171,7 +194,7 @@ void consumer() {
         strm.avail_out = CHUNK_SIZE;
         strm.next_out = out;
 
-        deflate(&strm, chunk.is_last ? Z_FINISH : Z_NO_FLUSH);
+        deflate(&strm, chunk.is_last_chunk ? Z_FINISH : Z_NO_FLUSH);
         size_t compressed_size = CHUNK_SIZE - strm.avail_out;
 
         deflateEnd(&strm);
@@ -185,13 +208,38 @@ void consumer() {
         compressedChunk->written = 0;
         omp_unset_lock(&lock);
 
-        if (last_chunk_processed) {
-            omp_set_lock(&lock);
-            compressedChunk = &compressedQueue[current_chunk_id % QUEUE_SIZE];
-            compressedChunk->size = (size_t)-1; // Mark this chunk as the last chunk
-            compressedChunk->written = 0;
-            omp_unset_lock(&lock);
+        #pragma omp atomic
+        ++processed_chunk_count;
+        printf("Rank: %d, Thread: %d - Compressed chunk %d\n", mpi_proc_rank, omp_get_thread_num(), processed_chunk_count);
+
+        if (final_chunk_processed && chunk.is_last_chunk) {
+            for (int i = 0; i < omp_get_num_threads() - 1; ++i) {
+                printf("Rank: %d, Thread: %d - Send signals to unlock blocked threads\n", mpi_proc_rank, omp_get_thread_num());
+                sem_post(sem_queue_not_empty);
+            }
         }
+    }
+
+    #pragma omp atomic
+    active_consumer_count--;
+
+    #pragma omp master
+    {
+        while (1) {
+            #pragma omp flush(active_consumer_count)
+            if (active_consumer_count == 0) {
+                break;
+            }
+            sleep(100);
+        }
+
+        omp_set_lock(&lock);
+        CompressedChunk *compressedChunk = &compressedQueue[current_chunk_id % QUEUE_SIZE];
+        compressedChunk->size = (size_t)-1;
+        compressedChunk->written = 0;
+        omp_unset_lock(&lock);
+
+        printf("Rank: %d, Thread: %d - Total processed chunk: %d\n", mpi_proc_rank, omp_get_thread_num(), processed_chunk_count);
     }
 }
 
@@ -220,12 +268,17 @@ void writer(const char *output_filename) {
 void do_compression(const char *input_dir, const char *output_dir, const char *file_record, int world_rank) {
     omp_init_lock(&lock);
     omp_init_lock(&queue_lock);
+    omp_set_num_threads(NUM_CONSUMERS + 1);
 
     init_semaphores(world_rank);
 
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_proc_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_proc_rank);
+
+    max_record_line_num = count_non_empty_lines(file_record);
 
     printf("Initialized semaphores in %d process\n", world_rank);
+    printf("Max record line num: %d\n", max_record_line_num);
 
     #pragma omp parallel sections
     {
@@ -236,16 +289,18 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
             printf("Producer %d finished\n", world_rank);
         }
 
-//        #pragma omp section
-//        {
-//            printf("Consumer %d\n", world_rank);
-//            for (int i = 0; i < NUM_CONSUMERS; ++i) {
-//                #pragma omp task
-//                {
-//                    consumer();
-//                }
-//            }
-//        }
+        #pragma omp section
+        {
+            printf("Consumer %d\n", world_rank);
+            for (int i = 0; i < NUM_CONSUMERS; ++i) {
+                #pragma omp task
+                {
+                    consumer();
+                    printf("Consumer %d finished\n", omp_get_thread_num());
+                }
+            }
+//            consumer();
+        }
 //
 //        #pragma omp section
 //        {
