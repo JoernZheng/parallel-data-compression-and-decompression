@@ -51,7 +51,7 @@ void collect_files(const char *base_path, const char *current_path, FileEntry **
     closedir(dir);
 }
 
-void sort_files_by_size(const char *path) {
+char *sort_files_by_size(const char *path) {
     FileEntry *files = NULL;
     int count = 0;
 
@@ -85,7 +85,7 @@ void sort_files_by_size(const char *path) {
 
     qsort(files, count, sizeof(FileEntry), compare_file_size);
 
-    char output_filename[1024];
+    char *output_filename = (char *) malloc(1024);
     sprintf(output_filename, "%s/sorted_files_by_size.txt", parent_directory);
     FILE *file = fopen(output_filename, "w");
     if (file != NULL) {
@@ -96,4 +96,6 @@ void sort_files_by_size(const char *path) {
         fclose(file);
     }
     free(files);
+
+    return output_filename;
 }
