@@ -230,7 +230,7 @@ void consumer() {
             if (active_consumer_count == 0) {
                 break;
             }
-            sleep(100);
+            usleep(100);
         }
 
         omp_set_lock(&lock);
@@ -296,10 +296,9 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
                 #pragma omp task
                 {
                     consumer();
-                    printf("Consumer %d finished\n", omp_get_thread_num());
+                    printf("Consumer %d finished\n", i);
                 }
             }
-//            consumer();
         }
 //
 //        #pragma omp section

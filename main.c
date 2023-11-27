@@ -19,18 +19,14 @@ void compress(const char *folder_path, const char *output_path) {
         free(file_record);  // 释放原始 file_record 指针
     }
 
-    // 使用 MPI_Bcast 广播文件记录路径到所有进程
+    // 2.Broadcast file_record_path
     MPI_Bcast(file_record_path, sizeof(file_record_path), MPI_CHAR, 0, MPI_COMM_WORLD);
 
-    printf("Process %d\n", world_rank);
-
-    // 2.Distribute files to processes
+    // 3.Compress files
     do_compression(folder_path, output_path, file_record_path, world_rank);
+    printf("main.c - Rank: %d - do_compression finished\n", world_rank);
 
-    //3.Compress files
-
-
-
+    // 4.Clean up
     if (file_record != NULL) {
         free(file_record);
     }
