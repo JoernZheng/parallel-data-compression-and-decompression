@@ -3,7 +3,7 @@
 #include "process.h"
 #include <stdlib.h>
 
-void compress(const char *folder_path, const char *output_path) {
+void _compress(const char *folder_path, const char *output_path) {
     int world_rank;
     char *file_record = NULL;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
@@ -32,7 +32,7 @@ void compress(const char *folder_path, const char *output_path) {
     }
 }
 
-void decompress(const char *folder_path) {
+void _decompress(const char *folder_path) {
     // 解压缩操作的实现
     printf("Decompressing folder: %s\n", folder_path);
     // 这里添加解压缩的具体逻辑
@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
     const char *output_path = argv[3];
 
     if (strcmp(operation, "compress") == 0) {
-        compress(folder_path, output_path);
+        _compress(folder_path, output_path);
     } else if (strcmp(operation, "decompress") == 0) {
-        decompress(folder_path);
+        _decompress(folder_path);
     } else {
         printf("Invalid operation: %s. Please use 'compress' or 'decompress'.\n", operation);
         MPI_Abort(MPI_COMM_WORLD, 1);

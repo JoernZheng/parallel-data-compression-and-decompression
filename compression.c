@@ -1,30 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <omp.h>
-#include <zlib.h>
-#include <string.h>
-#include <semaphore.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <mpi.h>
 #include "process.h"
-
-#define CHUNK_SIZE 16384
-#define QUEUE_SIZE 100
-#define NUM_CONSUMERS 4
-
-typedef struct {
-    unsigned char data[CHUNK_SIZE];
-    size_t size;
-    int is_last_chunk;
-    int is_last_file;
-} Chunk;
-
-typedef struct {
-    unsigned char content[CHUNK_SIZE];
-    size_t size;
-    int written; // 0: not written, 1: written
-} CompressedChunk;
 
 Chunk queue[QUEUE_SIZE];
 int queue_head = 0;
@@ -48,6 +22,11 @@ int max_record_line_num;
 int final_chunk_processed = 0;
 int processed_chunk_count = 0;
 int active_consumer_count = NUM_CONSUMERS;
+
+// Compressed file output directory
+int next_output_id = 0;
+char *output_filename;
+FILE *dest;
 
 void init_semaphores(int world_rank) {
     char sem_name_full[256];
@@ -79,6 +58,17 @@ void destroy_semaphores(int world_rank) {
     sem_close(sem_queue_not_empty);
     sem_unlink(sem_name_full);
     sem_unlink(sem_name_empty);
+}
+
+void data_writer(const char *filename, size_t compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest) {
+    ChunkHeader header;
+    strncpy(header.filename, filename, sizeof(header.filename) - 1);
+    header.filename[sizeof(header.filename) - 1] = '\0'; // Ensure null-termination
+    header.size = compressed_size;
+    header.is_last = is_last;
+
+    fwrite(&header, sizeof(header), 1, dest);
+    fwrite(compressed_data, 1, compressed_size, dest);
 }
 
 // Create chunks of data from files
@@ -133,6 +123,7 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
             Chunk chunk;
             size_t bytes_read;
             while ((bytes_read = fread(chunk.data, 1, CHUNK_SIZE, source)) > 0) {
+                extract_filename(chunk.filename, full_path);
                 chunk.size = bytes_read;
                 chunk.is_last_chunk = feof(source);
                 if (next_file_number >= max_record_line_num) {
@@ -199,14 +190,7 @@ void consumer() {
 
         deflateEnd(&strm);
 
-        // Add the compressed chunk to the Array
-        omp_set_lock(&lock);
-        int chunk_id = current_chunk_id++;
-        CompressedChunk *compressedChunk = &compressedQueue[chunk_id % QUEUE_SIZE];
-        memcpy(compressedChunk->content, out, compressed_size);
-        compressedChunk->size = compressed_size;
-        compressedChunk->written = 0;
-        omp_unset_lock(&lock);
+        data_writer(chunk.filename, compressed_size, out, chunk.is_last_file, dest);
 
         #pragma omp atomic
         ++processed_chunk_count;
@@ -219,50 +203,103 @@ void consumer() {
             }
         }
     }
+}
 
-    #pragma omp atomic
-    active_consumer_count--;
-
-    #pragma omp master
-    {
-        while (1) {
-            #pragma omp flush(active_consumer_count)
-            if (active_consumer_count == 0) {
-                break;
-            }
-            usleep(100);
-        }
-
-        omp_set_lock(&lock);
-        CompressedChunk *compressedChunk = &compressedQueue[current_chunk_id % QUEUE_SIZE];
-        compressedChunk->size = (size_t)-1;
-        compressedChunk->written = 0;
-        omp_unset_lock(&lock);
-
-        printf("Rank: %d, Thread: %d - Total processed chunk: %d\n", mpi_proc_rank, omp_get_thread_num(), processed_chunk_count);
+void init_output_filename(const char *output_dir, int world_rank) {
+    output_filename = malloc(strlen(output_dir) + 256);
+    int output_dir_len = strlen(output_dir);
+    if (output_dir[output_dir_len - 1] == '/') {
+        sprintf(output_filename, "%scompressed_%d.zwz", output_dir, world_rank);
+    } else {
+        sprintf(output_filename, "%s/compressed_%d.zwz", output_dir, world_rank);
     }
 }
 
-// Write compressed chunks to file
-void writer(const char *output_filename) {
-    FILE *dest = fopen(output_filename, "wb");
-    int written_chunk_id = 0;
-
-    while (1) {
-        CompressedChunk *compressedChunk = &compressedQueue[written_chunk_id % QUEUE_SIZE];
-        if (compressedChunk->size == (size_t)-1) { // If this is the last chunk
-            omp_unset_lock(&lock);
-            break;
-        }
-
-        if (!compressedChunk->written && compressedChunk->size > 0) {
-            fwrite(compressedChunk->content, 1, compressedChunk->size, dest);
-            compressedChunk->written = 1;
-            written_chunk_id++;
-        }
+void write_file_record_to_dest(const char *file_record, FILE *dest) {
+    FILE *record_file = fopen(file_record, "rb");
+    if (!record_file) {
+        perror("Error opening file record");
+        return;
     }
 
-    fclose(dest);
+    // Get file size
+    fseek(record_file, 0, SEEK_END);
+    long file_size = ftell(record_file);
+    fseek(record_file, 0, SEEK_SET);
+
+    // Read file content
+    char *buffer = malloc(file_size);
+    if (!buffer) {
+        perror("Memory allocation failed");
+        fclose(record_file);
+        return;
+    }
+    fread(buffer, file_size, 1, record_file);
+    fclose(record_file);
+
+    // Initialize zlib compression stream
+    z_stream strm;
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    if (deflateInit(&strm, Z_DEFAULT_COMPRESSION) != Z_OK) {
+        free(buffer);
+        return;
+    }
+
+    strm.avail_in = file_size;
+    strm.next_in = (Bytef *)buffer;
+
+    // Initialize dynamic buffer
+    size_t out_capacity = CHUNK_SIZE;  // Initial capacity
+    unsigned char *out = malloc(out_capacity);
+    if (!out) {
+        perror("Memory allocation failed");
+        free(buffer);
+        deflateEnd(&strm);
+        return;
+    }
+
+    strm.avail_out = out_capacity;
+    strm.next_out = out;
+
+    // Loop to compress and dynamically expand buffer
+    int ret;
+    do {
+        ret = deflate(&strm, Z_FINISH);
+        if (strm.avail_out == 0) {
+            // Buffer is full, need to expand
+            out_capacity *= 2;
+            unsigned char *new_out = realloc(out, out_capacity);
+            if (!new_out) {
+                perror("Memory reallocation failed");
+                free(buffer);
+                free(out);
+                deflateEnd(&strm);
+                return;
+            }
+            out = new_out;
+            strm.avail_out = out_capacity - (strm.next_out - out);
+            strm.next_out = out + (out_capacity / 2);
+        }
+    } while (ret == Z_OK);
+
+    deflateEnd(&strm);
+
+    // Record size of compressed data
+    size_t compressed_size = strm.next_out - out;
+
+    // Create file header and write it
+    FileHeader header;
+    extract_filename(header.filename, file_record);
+    header.size = compressed_size;
+    fwrite(&header, sizeof(FileHeader), 1, dest);
+
+    // Write compressed data
+    fwrite(out, 1, compressed_size, dest);
+
+    free(buffer);
+    free(out);
 }
 
 void do_compression(const char *input_dir, const char *output_dir, const char *file_record, int world_rank) {
@@ -276,6 +313,11 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_proc_rank);
 
     max_record_line_num = count_non_empty_lines(file_record);
+
+    init_output_filename(output_dir, world_rank);
+    dest = fopen(output_filename, "wb");
+
+
 
     printf("Initialized semaphores in %d process\n", world_rank);
     printf("Max record line num: %d\n", max_record_line_num);
@@ -300,21 +342,10 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
                 }
             }
         }
-//
-//        #pragma omp section
-//        {
-//            char *output_filename = malloc(strlen(output_dir) + 256);
-//            int output_dir_len = strlen(output_dir);
-//            if (output_dir[output_dir_len - 1] == '/') {
-//                sprintf(output_filename, "%scompressed_%d.tar.gz", output_dir, world_rank);
-//            } else {
-//                sprintf(output_filename, "%s/compressed_%d.tar.gz", output_dir, world_rank);
-//            }
-//            writer(output_filename);
-//        }
     }
 
     omp_destroy_lock(&lock);
     omp_destroy_lock(&queue_lock);
     destroy_semaphores(world_rank);
+    fclose(dest);
 }

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 
 int count_non_empty_lines(const char *file_path) {
     FILE *file = fopen(file_path, "r");
@@ -30,4 +31,13 @@ int count_non_empty_lines(const char *file_path) {
 
     fclose(file);
     return lines;
+}
+
+void extract_filename(char *filename, const char *filepath) {
+    const char *last_slash = strrchr(filepath, '/');
+    if (last_slash) {
+        strcpy(filename, last_slash + 1);
+    } else {
+        strcpy(filename, filepath);
+    }
 }
