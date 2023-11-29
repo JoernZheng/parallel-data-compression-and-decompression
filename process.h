@@ -21,10 +21,10 @@ typedef struct {
     off_t size;
 } FileEntry;
 
-typedef struct {
-    char filename[255];
-    size_t size;
-} FileHeader;
+//typedef struct {
+//    char filename[255];
+//    size_t size;
+//} FileHeader;
 
 typedef struct {
     char filename[255];

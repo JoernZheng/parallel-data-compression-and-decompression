@@ -311,10 +311,11 @@ void write_file_record_to_dest(const char *file_record, FILE *dest) {
     size_t compressed_size = strm.next_out - out;
 
     // Create file header and write it
-    FileHeader header;
+    ChunkHeader header;
     extract_filename(header.filename, file_record);
     header.size = compressed_size;
-    fwrite(&header, sizeof(FileHeader), 1, dest);
+    header.is_last = 1;
+    fwrite(&header, sizeof(ChunkHeader), 1, dest);
 
     // Write compressed data
     fwrite(out, 1, compressed_size, dest);
