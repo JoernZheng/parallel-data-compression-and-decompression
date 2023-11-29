@@ -23,13 +23,24 @@ void _compress(const char *folder_path, const char *output_path) {
     printf("main.c - Rank: %d - do_compression finished\n", world_rank);
 }
 
-void _decompress(const char *folder_path) {
-    // Decompression operation implementation
-    printf("Decompressing folder: %s\n", folder_path);
-    // Add specific logic for decompression here
+void _decompress(const char *source_path, const char *output_path ) {
+    int world_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    if (world_rank == 0) {
+        if (world_size > 1) {
+            printf("Decompression is not supported in MPI parallel mode.\n");
+            printf("Only use one process to decompress.\n");
+            printf("Decompression uses multiple threads to parallel decompress files.\n");
+        }
+
+        do_decompression(source_path, output_path);
+    }
 }
 
 // Main function handling compression and decompression
+// todo: 确保输入输出文件夹存在。另外确保文件夹格式正确
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -41,14 +52,14 @@ int main(int argc, char *argv[]) {
     }
 
     const char *operation = argv[1];
-    const char *folder_path = argv[2];
+    const char *source_path = argv[2];
     const char *output_path = argv[3];
 
     // Execute the specified operation
     if (strcmp(operation, "compress") == 0) {
-        _compress(folder_path, output_path);
+        _compress(source_path, output_path);
     } else if (strcmp(operation, "decompress") == 0) {
-        _decompress(folder_path);
+        _decompress(source_path, output_path);
     } else {
         printf("Invalid operation: %s. Please use 'compress' or 'decompress'.\n", operation);
         MPI_Abort(MPI_COMM_WORLD, 1);

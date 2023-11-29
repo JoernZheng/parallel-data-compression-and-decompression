@@ -52,5 +52,6 @@ char *sort_files_by_size(const char *path);
 void do_compression(const char *input_dir, const char *output_dir, const char *file_record, int world_rank);
 int count_non_empty_lines(const char *file_path);
 void extract_filename(char *filename, const char *filepath);
+void do_decompression(const char *source_path, const char *output_path);
 
 #endif
