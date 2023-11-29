@@ -38,6 +38,10 @@ void _decompress(const char *folder_path) {
     // 这里添加解压缩的具体逻辑
 }
 
+// todo: add file compression branch
+// todo: add folder existence check
+// todo: add decompression entrance
+// todo: fix the issue when count of files is less than process count
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 

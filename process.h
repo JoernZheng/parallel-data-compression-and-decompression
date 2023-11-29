@@ -10,10 +10,11 @@
 #include <semaphore.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <pthread.h>
 
 #define CHUNK_SIZE 16384
 #define QUEUE_SIZE 100
-#define NUM_CONSUMERS 4
+#define NUM_CONSUMERS 1
 
 typedef struct {
     char *relpath;
@@ -32,6 +33,7 @@ typedef struct {
 } ChunkHeader;
 
 typedef struct {
+    int id;
     char filename[255];
     unsigned char data[CHUNK_SIZE];
     size_t size;

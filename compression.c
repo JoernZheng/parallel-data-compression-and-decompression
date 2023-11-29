@@ -28,6 +28,10 @@ int next_output_id = 0;
 char *output_filename;
 FILE *dest;
 
+// Write controllers
+omp_lock_t write_lock;
+int next_chunk_to_write = 0;
+
 void init_semaphores(int world_rank) {
     char sem_name_full[256];
     char sem_name_empty[256];
@@ -85,7 +89,6 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
     int next_file_number = world_rank;
     int input_dir_len = strlen(input_dir);
 
-    // Debug
     int chunk_number = 0;
 
     // Remove trailing '/' if there is one
@@ -123,6 +126,7 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
             Chunk chunk;
             size_t bytes_read;
             while ((bytes_read = fread(chunk.data, 1, CHUNK_SIZE, source)) > 0) {
+                chunk.id = chunk_number++; // chunk.id = chunk_id;
                 extract_filename(chunk.filename, full_path);
                 chunk.size = bytes_read;
                 chunk.is_last_chunk = feof(source);
@@ -138,7 +142,7 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
                 omp_unset_lock(&queue_lock);
                 sem_post(sem_queue_not_empty);
 
-                printf("Rank: %d, Thread: %d - Produced chunk %d\n", omp_get_thread_num(), world_rank, ++chunk_number);
+                printf("Rank: %d, Thread: %d - Produced chunk %d\n", world_rank, omp_get_thread_num(), chunk_number - 1);
             }
 
             fclose(source);
@@ -158,6 +162,7 @@ void consumer() {
         sem_wait(sem_queue_not_empty);
 
         // Avoid deadlock
+        #pragma omp flush(final_chunk_processed)
         if (final_chunk_processed) {
             break;
         }
@@ -166,13 +171,12 @@ void consumer() {
         Chunk chunk = queue[queue_head];
         if (chunk.is_last_file && chunk.is_last_chunk) {
             final_chunk_processed = 1;
-            printf("Rank: %d, Thread: %d - Thread exit due to no remaining tasks\n", mpi_proc_rank, omp_get_thread_num());
         }
         queue_head = (queue_head + 1) % QUEUE_SIZE;
         omp_unset_lock(&queue_lock);
         sem_post(sem_queue_not_full);
 
-        // Compress the chunk
+        // Compress the chunk  -> zlib
         z_stream strm;
         strm.zalloc = Z_NULL;
         strm.zfree = Z_NULL;
@@ -190,7 +194,24 @@ void consumer() {
 
         deflateEnd(&strm);
 
-        data_writer(chunk.filename, compressed_size, out, chunk.is_last_file, dest);
+//        data_writer(chunk.filename, compressed_size, out, chunk.is_last_file, dest);
+        // Make sure only one thread is writing to the file according to the chunk id
+        while (1) {
+            omp_set_lock(&write_lock);
+            printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
+            printf("lock\n");
+            #pragma omp flush(next_chunk_to_write)
+            if (chunk.id == next_chunk_to_write) {
+                data_writer(chunk.filename, compressed_size, out, chunk.is_last_file, dest);
+                printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
+                next_chunk_to_write++;
+                printf("next_chunk_to_write: %d\n", next_chunk_to_write);
+                omp_unset_lock(&write_lock);
+                break;
+            }
+            omp_unset_lock(&write_lock);
+            printf("unlock\n");
+        }
 
         #pragma omp atomic
         ++processed_chunk_count;
@@ -302,9 +323,16 @@ void write_file_record_to_dest(const char *file_record, FILE *dest) {
     free(out);
 }
 
+
+//file_21979.txt (195988 bytes)    <----  1.相对路径  2.文件大小
+//file_21980.txt (176159 bytes)
+//file_21982.txt (129606 bytes)
+//file_21965.txt (123903 bytes)
+//file_21981.txt (83529 bytes)
 void do_compression(const char *input_dir, const char *output_dir, const char *file_record, int world_rank) {
     omp_init_lock(&lock);
     omp_init_lock(&queue_lock);
+    omp_init_lock(&write_lock);
     omp_set_num_threads(NUM_CONSUMERS + 1);
 
     init_semaphores(world_rank);
@@ -316,8 +344,7 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
 
     init_output_filename(output_dir, world_rank);
     dest = fopen(output_filename, "wb");
-
-
+    write_file_record_to_dest(file_record, dest);
 
     printf("Initialized semaphores in %d process\n", world_rank);
     printf("Max record line num: %d\n", max_record_line_num);
@@ -335,7 +362,7 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
         {
             printf("Consumer %d\n", world_rank);
             for (int i = 0; i < NUM_CONSUMERS; ++i) {
-                #pragma omp task
+                #pragma omp task // -> 创建一个任务，然后由一个线程来执行。线程从线程池中获取。
                 {
                     consumer();
                     printf("Consumer %d finished\n", i);
@@ -346,6 +373,7 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
 
     omp_destroy_lock(&lock);
     omp_destroy_lock(&queue_lock);
+    omp_destroy_lock(&write_lock);
     destroy_semaphores(world_rank);
     fclose(dest);
 }
