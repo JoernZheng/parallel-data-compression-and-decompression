@@ -2,9 +2,9 @@
 #include <dirent.h>
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
-    printf("Decompressing file: %s, is_last: %d\n", header.filename, header.is_last);
+    // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
 
-    // 初始化 zlib 解压缩流
+    // Initialize zlib decompression stream
     z_stream strm;
     strm.zalloc = Z_NULL;
     strm.zfree = Z_NULL;
@@ -14,15 +14,15 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
         return;
     }
 
-    // 分配输入和输出缓冲区
-    unsigned char in[CHUNK_SIZE];
-    unsigned char out[CHUNK_SIZE];
-    size_t remaining = header.size; // 压缩数据的剩余量
+    // Allocate input and output buffers
+    unsigned char in[CHUNK_SIZE + 1000];
+    unsigned char out[CHUNK_SIZE + 1000];
+    long remaining = header.size; // Remaining amount of compressed data
 
-    // 读取和解压缩数据
+    // Read and decompress data
     int ret;
     do {
-        size_t to_read = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
+        long to_read = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
         strm.avail_in = fread(in, sizeof(unsigned char), to_read, fp);
         if (strm.avail_in == 0) {
             break;
@@ -30,7 +30,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
         strm.next_in = in;
         remaining -= strm.avail_in;
 
-        // 解压缩数据到输出缓冲区
+        // Decompress data to output buffer
         do {
             strm.avail_out = CHUNK_SIZE;
             strm.next_out = out;
@@ -45,10 +45,9 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
         } while (strm.avail_out == 0);
     } while (ret != Z_STREAM_END && remaining > 0);
 
-    // 清理 zlib 流
+    // Clean up zlib stream
     inflateEnd(&strm);
 }
-
 
 void decompress_zwz(const char *file_path, const char *output_dir_path) {
     FILE *fp = fopen(file_path, "rb");
@@ -75,12 +74,12 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         return;
     }
 
-    // 第一个文件的header.is_last一定为1。
+    // The header.is_last of the first file must be 1
     decompress_file(fp, out_fp, header);
     fclose(out_fp);
     out_fp = NULL;
 
-    // 读取后续的header
+    // Read subsequent headers
     while (fread(&header, sizeof(ChunkHeader), 1, fp) == 1) {
         if (out_fp == NULL) {
             snprintf(output_file_path, sizeof(output_file_path), "%s/%s", output_dir_path, header.filename);
@@ -100,7 +99,6 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     }
 }
 
-
 void do_decompression(const char *source_dir_path, const char *output_dir_path) {
     // Step 1: Iterate through all files in the source directory, only deal with .zwz files
     DIR *dir;
@@ -111,7 +109,7 @@ void do_decompression(const char *source_dir_path, const char *output_dir_path) 
             if (strstr(ent->d_name, ".zwz") != NULL) {
                 char file_path[1024];
                 snprintf(file_path, sizeof(file_path), "%s/%s", source_dir_path, ent->d_name);
-                // Step2: Process each .zwz file
+                // Step 2: Process each .zwz file
                 decompress_zwz(file_path, output_dir_path);
             }
         }

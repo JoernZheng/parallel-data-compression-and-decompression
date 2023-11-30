@@ -61,7 +61,7 @@ void destroy_semaphores(int world_rank) {
     sem_unlink(sem_name_empty);
 }
 
-void data_writer(const char *filename, size_t compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest) {
+void data_writer(const char *filename, long compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest) {
     ChunkHeader header;
     strncpy(header.filename, filename, sizeof(header.filename) - 1);
     header.filename[sizeof(header.filename) - 1] = '\0'; // Ensure null-termination
@@ -70,8 +70,6 @@ void data_writer(const char *filename, size_t compressed_size, const unsigned ch
 
     fwrite(&header, sizeof(header), 1, dest);
     fwrite(compressed_data, sizeof(unsigned char), compressed_size, dest);
-
-    printf("Compressed_size: %zu\n", compressed_size);
 }
 
 // Create chunks of data from files
@@ -187,12 +185,15 @@ void consumer() {
 
         strm.avail_in = chunk.size;
         strm.next_in = chunk.data;
-        unsigned char out[CHUNK_SIZE];
-        strm.avail_out = CHUNK_SIZE;
+        unsigned char out[CHUNK_SIZE + 1000];
+        strm.avail_out = CHUNK_SIZE + 1000;
         strm.next_out = out;
 
-        deflate(&strm, chunk.is_last_chunk ? Z_FINISH : Z_NO_FLUSH);
-        size_t compressed_size = CHUNK_SIZE - strm.avail_out;
+        // deflate(&strm, chunk.is_last_chunk ? Z_FINISH : Z_NO_FLUSH);
+        deflate(&strm, Z_FINISH);
+        long compressed_size = CHUNK_SIZE + 1000 - strm.avail_out;
+        // printf("Chunk id: %d, original_size: %zu, compressed_size: %u\n", chunk.id, chunk.size, CHUNK_SIZE + 1000 - strm.avail_out);
+        // printf("compressed_size: %ld\n", compressed_size);
 
         deflateEnd(&strm);
 
@@ -354,16 +355,14 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
 
         #pragma omp section
         {
-//            printf("Consumer %d\n", world_rank);
-//            for (int i = 0; i < NUM_CONSUMERS; ++i) {
-//                #pragma omp task
-//                {
-//                    consumer();
-//                    printf("Consumer %d finished\n", i);
-//                }
-//            }
-            consumer();
-            printf("Consumer %d finished\n", world_rank);
+            printf("Consumer %d\n", world_rank);
+            for (int i = 0; i < NUM_CONSUMERS; ++i) {
+                #pragma omp task
+                {
+                    consumer();
+                    printf("Consumer %d finished\n", i);
+                }
+            }
         }
     }
 

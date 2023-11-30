@@ -12,23 +12,18 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
-#define CHUNK_SIZE 16384
+#define CHUNK_SIZE 65535
 #define QUEUE_SIZE 100
-#define NUM_CONSUMERS 1
+#define NUM_CONSUMERS 3
 
 typedef struct {
     char *relpath;
     off_t size;
 } FileEntry;
 
-//typedef struct {
-//    char filename[255];
-//    size_t size;
-//} FileHeader;
-
 typedef struct {
     char filename[255];
-    size_t size;    // Size of the compressed file
+    long size;    // Size of the compressed file
     int is_last;    // If this is the last chunk of the file
 } ChunkHeader;
 
