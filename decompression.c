@@ -2,6 +2,8 @@
 #include <dirent.h>
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
+    printf("Decompressing file: %s, is_last: %d\n", header.filename, header.is_last);
+
     // 初始化 zlib 解压缩流
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -21,7 +23,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     int ret;
     do {
         size_t to_read = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
-        strm.avail_in = fread(in, 1, to_read, fp);
+        strm.avail_in = fread(in, sizeof(unsigned char), to_read, fp);
         if (strm.avail_in == 0) {
             break;
         }

@@ -4,9 +4,6 @@ Chunk queue[QUEUE_SIZE];
 int queue_head = 0;
 int queue_tail = 0;
 
-CompressedChunk compressedQueue[QUEUE_SIZE];
-int current_chunk_id = 0; // The id of the chunk that is being compressed
-
 omp_lock_t lock;
 omp_lock_t queue_lock;
 
@@ -72,7 +69,9 @@ void data_writer(const char *filename, size_t compressed_size, const unsigned ch
     header.is_last = is_last;
 
     fwrite(&header, sizeof(header), 1, dest);
-    fwrite(compressed_data, 1, compressed_size, dest);
+    fwrite(compressed_data, sizeof(unsigned char), compressed_size, dest);
+
+    printf("Compressed_size: %zu\n", compressed_size);
 }
 
 // Create chunks of data from files
@@ -112,7 +111,7 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
             next_file_number += mpi_proc_size;
             char full_path[1024];
             sprintf(full_path, format_string, input_dir, file_path);
-            // printf("Rank: %d - Processing file: %s\n", world_rank, full_path);
+            printf("Rank: %d - Processing file: %s\n", world_rank, full_path);
             full_path[strcspn(full_path, "\n")] = 0; // Remove trailing '\n'
 
             FILE *source = fopen(full_path, "rb");
@@ -134,6 +133,8 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
                     if (chunk.is_last_file == 0) {
                         chunk.is_last_file = 1;
                     }
+                } else {
+                    chunk.is_last_file = 0;
                 }
                 sem_wait(sem_queue_not_full);
                 omp_set_lock(&queue_lock);
@@ -169,6 +170,7 @@ void consumer() {
 
         omp_set_lock(&queue_lock);
         Chunk chunk = queue[queue_head];
+        printf("Chunk id: %d, is_last_file: %d, is_last_chunk: %d, filename: %s\n", chunk.id, chunk.is_last_file, chunk.is_last_chunk, chunk.filename);
         if (chunk.is_last_file && chunk.is_last_chunk) {
             final_chunk_processed = 1;
         }
@@ -194,23 +196,20 @@ void consumer() {
 
         deflateEnd(&strm);
 
-//        data_writer(chunk.filename, compressed_size, out, chunk.is_last_file, dest);
         // Make sure only one thread is writing to the file according to the chunk id
         while (1) {
             omp_set_lock(&write_lock);
-            printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
-            printf("lock\n");
             #pragma omp flush(next_chunk_to_write)
             if (chunk.id == next_chunk_to_write) {
-                data_writer(chunk.filename, compressed_size, out, chunk.is_last_file, dest);
-                printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
+                data_writer(chunk.filename, compressed_size, out, chunk.is_last_chunk, dest);
+                // printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
                 next_chunk_to_write++;
-                printf("next_chunk_to_write: %d\n", next_chunk_to_write);
+                // printf("next_chunk_to_write: %d\n", next_chunk_to_write);
+                printf("Write data for chunk %d, filename: %s\n", chunk.id, chunk.filename);
                 omp_unset_lock(&write_lock);
                 break;
             }
             omp_unset_lock(&write_lock);
-            printf("unlock\n");
         }
 
         #pragma omp atomic
@@ -324,12 +323,6 @@ void write_file_record_to_dest(const char *file_record, FILE *dest) {
     free(out);
 }
 
-
-//file_21979.txt (195988 bytes)    <----  1.相对路径  2.文件大小
-//file_21980.txt (176159 bytes)
-//file_21982.txt (129606 bytes)
-//file_21965.txt (123903 bytes)
-//file_21981.txt (83529 bytes)
 void do_compression(const char *input_dir, const char *output_dir, const char *file_record, int world_rank) {
     omp_init_lock(&lock);
     omp_init_lock(&queue_lock);
@@ -361,14 +354,16 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
 
         #pragma omp section
         {
-            printf("Consumer %d\n", world_rank);
-            for (int i = 0; i < NUM_CONSUMERS; ++i) {
-                #pragma omp task // -> 创建一个任务，然后由一个线程来执行。线程从线程池中获取。
-                {
-                    consumer();
-                    printf("Consumer %d finished\n", i);
-                }
-            }
+//            printf("Consumer %d\n", world_rank);
+//            for (int i = 0; i < NUM_CONSUMERS; ++i) {
+//                #pragma omp task
+//                {
+//                    consumer();
+//                    printf("Consumer %d finished\n", i);
+//                }
+//            }
+            consumer();
+            printf("Consumer %d finished\n", world_rank);
         }
     }
 
