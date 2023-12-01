@@ -65,6 +65,10 @@ STEP 2: After decompression, calculate the verification information from the dec
 ![Verification Process](pictures/csci596-validation.png)
 
 ## Benchmarking
+### Compression
+![Compression Benchmark](pictures/csci596-preformance.png)
+
+This is a preliminary testing, we will add more data in the future.
 
 ## Contributions
 - Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking.
