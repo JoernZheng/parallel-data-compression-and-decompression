@@ -1,5 +1,5 @@
 
-# Parallel Directory Compression and Decompression
+# Parallel Data Compression and Decompression
 
 ## Authors
 - Yaowen Zheng - USC Computer Science
