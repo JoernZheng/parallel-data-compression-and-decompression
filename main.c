@@ -23,7 +23,7 @@ void _compress(const char *folder_path, const char *output_path) {
     printf("main.c - Rank: %d - do_compression finished\n", world_rank);
 }
 
-void _decompress(const char *source_path, const char *output_path ) {
+void _decompress(const char *source_path, const char *output_path) {
     int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -37,6 +37,13 @@ void _decompress(const char *source_path, const char *output_path ) {
 
         do_decompression(source_path, output_path);
     }
+}
+
+void _verify(const char *source_path, const char *output_path) {
+    int world_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    do_verification(source_path, output_path);
 }
 
 // Main function handling compression and decompression
@@ -60,6 +67,8 @@ int main(int argc, char *argv[]) {
         _compress(source_path, output_path);
     } else if (strcmp(operation, "decompress") == 0) {
         _decompress(source_path, output_path);
+    } else if (strcmp(operation, "verify") == 0){
+        _verify(source_path, output_path);
     } else {
         printf("Invalid operation: %s. Please use 'compress' or 'decompress'.\n", operation);
         MPI_Abort(MPI_COMM_WORLD, 1);

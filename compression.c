@@ -20,7 +20,7 @@ int final_chunk_processed = 0;
 int processed_chunk_count = 0;
 int active_consumer_count = NUM_CONSUMERS;
 
-// Compressed file output directory
+// Compressed file output
 int next_output_id = 0;
 char *output_filename;
 FILE *dest;
@@ -61,12 +61,27 @@ void destroy_semaphores(int world_rank) {
     sem_unlink(sem_name_empty);
 }
 
-void data_writer(const char *filename, long compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest) {
+// void data_writer(const char *filename, long compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest) {
+//     ChunkHeader header;
+//     strncpy(header.filename, filename, sizeof(header.filename) - 1);
+//     header.filename[sizeof(header.filename) - 1] = '\0'; // Ensure null-termination
+//     header.size = compressed_size;
+//     header.is_last = is_last;
+
+//     fwrite(&header, sizeof(header), 1, dest);
+//     fwrite(compressed_data, sizeof(unsigned char), compressed_size, dest);
+// }
+
+void data_writer(const char *filename, long compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest, char *full_path) {
     ChunkHeader header;
     strncpy(header.filename, filename, sizeof(header.filename) - 1);
     header.filename[sizeof(header.filename) - 1] = '\0'; // Ensure null-termination
     header.size = compressed_size;
     header.is_last = is_last;
+    char *hash = get_hash(full_path);
+    strncpy(header.hash_value, hash, sizeof(header.hash_value) - 1);
+    header.hash_value[sizeof(header.hash_value) - 1] = '\0';
+    printf("Hash value of %s: %s\n", filename, header.hash_value);
 
     fwrite(&header, sizeof(header), 1, dest);
     fwrite(compressed_data, sizeof(unsigned char), compressed_size, dest);
@@ -134,6 +149,8 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
                 } else {
                     chunk.is_last_file = 0;
                 }
+                strncpy(chunk.full_path, full_path, sizeof(chunk.full_path) - 1);
+                chunk.full_path[sizeof(chunk.full_path) - 1] = '\0';
                 sem_wait(sem_queue_not_full);
                 omp_set_lock(&queue_lock);
                 queue[queue_tail] = chunk;
@@ -202,7 +219,7 @@ void consumer() {
             omp_set_lock(&write_lock);
             #pragma omp flush(next_chunk_to_write)
             if (chunk.id == next_chunk_to_write) {
-                data_writer(chunk.filename, compressed_size, out, chunk.is_last_chunk, dest);
+                data_writer(chunk.filename, compressed_size, out, chunk.is_last_chunk, dest, chunk.full_path);
                 // printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
                 next_chunk_to_write++;
                 // printf("next_chunk_to_write: %d\n", next_chunk_to_write);
@@ -323,6 +340,37 @@ void write_file_record_to_dest(const char *file_record, FILE *dest) {
     free(buffer);
     free(out);
 }
+
+// char *get_hash(const char *full_path) {
+//     size_t bytes_read;
+//     MD5_CTX md5_context;
+//     unsigned char buffer[BUFFER_SIZE];
+//     unsigned char digest[MD5_DIGEST_LENGTH];
+//     char *hash = malloc(2 * MD5_DIGEST_LENGTH + 1);
+
+//     FILE *file = fopen(full_path, "rb");
+//     if (!file) {
+//         perror("Error opening the file");
+//         return NULL;
+//     }
+
+//     MD5_Init(&md5_context);
+
+//     while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) != 0) {
+//         MD5_Update(&md5_context, buffer, bytes_read);
+//     }
+
+//     MD5_Final(digest, &md5_context);
+
+//     fclose(file);
+
+//     // convert binary digest to a string
+//     for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+//         sprintf(&hash[i * 2], "%02x", digest[i]);
+//     }
+
+//     return hash;
+// }
 
 void do_compression(const char *input_dir, const char *output_dir, const char *file_record, int world_rank) {
     omp_init_lock(&lock);
