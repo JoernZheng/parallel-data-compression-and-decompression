@@ -8,6 +8,7 @@
 // 2.和压缩包末尾的哈希值进行比较
 
 #include "process.h"
+#include <dirent.h>
 
 char *get_hash(const char *full_path) {
     size_t bytes_read;
@@ -40,6 +41,26 @@ char *get_hash(const char *full_path) {
     return hash;
 }
 
+void verify(const char *hash_ori, const char *hash_decmprs) {
+
+}
+
 void do_verification(const char *source_path, const char *output_path) {
     // printf("%s\n", source_path);
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir(source_path)) != NULL) {
+        while ((ent = readdir(dir)) != NULL) {
+            if (strcmp(ent->d_name, "sorted_files_by_size.txt") != 0 && strstr(ent->d_name, ".txt") != NULL) {
+                char full_path[1024];
+                snprintf(full_path, sizeof(full_path), "%s/%s", source_path, ent->d_name);
+                char *hash = get_hash(full_path);
+                printf("hash of %s: %s\n", full_path, hash);
+            } 
+        }
+
+        closedir(dir);
+    } else {
+        perror("Could not open source directory");
+    }
 }
