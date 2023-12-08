@@ -9,6 +9,7 @@
 
 #include "process.h"
 #include <dirent.h>
+#include <sys/stat.h>
 
 char *get_hash(const char *full_path) {
     size_t bytes_read;
@@ -41,11 +42,22 @@ char *get_hash(const char *full_path) {
     return hash;
 }
 
-void verify(const char *hash_header, const char *hash_decmprs, const char *filename, const char *file_path) {
-    if (strcmp(hash_decmprs, hash_header) == 0) {
-        printf("same\n");
-    } else {
-        printf("not same\n");
+void verify(const char *hash_header, const char *hash_decmprs, const char *filename, const char *file_path, const char *output_dir_path) {
+    if (strcmp(hash_decmprs, hash_header) != 0) {
+        DIR *dir;
+        char dest[1024];
+        sprintf(dest, "%s/%s", output_dir_path, filename);
+
+        // move bad files into the "bad" directory
+        if ((dir = opendir(output_dir_path)) != NULL || mkdir(output_dir_path, 0777) == 0) {
+            if (rename(file_path, dest) == 0) {
+                printf("Bad file <%s> found. Moved to <%s> directory\n", filename, output_dir_path);
+            } else {
+                perror("Error moving file");
+            }
+
+            closedir(dir);
+        }
     }
 }
 
@@ -59,7 +71,7 @@ void do_verification(const char *source_path, const char *output_path) {
                 char full_path[1024];
                 snprintf(full_path, sizeof(full_path), "%s/%s", source_path, ent->d_name);
                 char *hash = get_hash(full_path);
-                printf("hash of %s: %s\n", full_path, hash);
+                // printf("hash of %s: %s\n", full_path, hash);
             } 
         }
 

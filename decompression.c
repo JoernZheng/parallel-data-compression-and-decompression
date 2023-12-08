@@ -96,11 +96,11 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         if (header.is_last == 1) {
             fclose(out_fp);
             out_fp = NULL;
-
             // compare the hash value after decompression to verify the correctness of decompression
             char *hash = get_hash(output_file_path);
-            verify(header.hash_value, hash, header.filename, output_file_path);
-            printf("Hash of %s: %s and it's original hash value: %s\n", output_file_path, hash, header.hash_value);
+            char *bad_dir = "../bad";
+            verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
+            // printf("Hash of %s: %s and it's original hash value: %s\n", output_file_path, hash, header.hash_value);
         }
     }
 }
