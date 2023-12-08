@@ -99,7 +99,7 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
 
             // compare the hash value after decompression to verify the correctness of decompression
             char *hash = get_hash(output_file_path);
-            verify(header.hash_value, hash);
+            verify(header.hash_value, hash, header.filename, output_file_path);
             printf("Hash of %s: %s and it's original hash value: %s\n", output_file_path, hash, header.hash_value);
         }
     }

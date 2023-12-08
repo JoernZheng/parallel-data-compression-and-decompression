@@ -41,8 +41,12 @@ char *get_hash(const char *full_path) {
     return hash;
 }
 
-void verify(const char *hash_ori, const char *hash_decmprs) {
-
+void verify(const char *hash_header, const char *hash_decmprs, const char *filename, const char *file_path) {
+    if (strcmp(hash_decmprs, hash_header) == 0) {
+        printf("same\n");
+    } else {
+        printf("not same\n");
+    }
 }
 
 void do_verification(const char *source_path, const char *output_path) {
