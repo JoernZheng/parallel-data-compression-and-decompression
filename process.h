@@ -67,7 +67,6 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
 int count_non_empty_lines(const char *file_path);
 void extract_filename(char *filename, const char *filepath);
 void do_decompression(const char *source_path, const char *output_path);
-void do_verification(const char *source_path, const char *output_path);
 char *get_hash(const char *full_path);
 void verify(const char *hash_header, const char *hash_decmprs, const char *filename, const char *file_path, const char *output_dir_path);
 

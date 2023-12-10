@@ -1,12 +1,3 @@
-// 压缩过程中：
-// 1.扫描所有文件，计算文件内容的哈希值
-// 2.计算全局唯一的哈希值
-// 3.把哈希值写入到压缩包的末尾
-
-// 解压过程中：
-// 1.在解压过程中/完成后，计算全局唯一的哈希值  MD5等都行
-// 2.和压缩包末尾的哈希值进行比较
-
 #include "process.h"
 #include <dirent.h>
 #include <sys/stat.h>
@@ -58,25 +49,5 @@ void verify(const char *hash_header, const char *hash_decmprs, const char *filen
 
             closedir(dir);
         }
-    }
-}
-
-void do_verification(const char *source_path, const char *output_path) {
-    // printf("%s\n", source_path);
-    DIR *dir;
-    struct dirent *ent;
-    if ((dir = opendir(source_path)) != NULL) {
-        while ((ent = readdir(dir)) != NULL) {
-            if (strcmp(ent->d_name, "sorted_files_by_size.txt") != 0 && strstr(ent->d_name, ".txt") != NULL) {
-                char full_path[1024];
-                snprintf(full_path, sizeof(full_path), "%s/%s", source_path, ent->d_name);
-                char *hash = get_hash(full_path);
-                // printf("hash of %s: %s\n", full_path, hash);
-            } 
-        }
-
-        closedir(dir);
-    } else {
-        perror("Could not open source directory");
     }
 }
