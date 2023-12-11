@@ -33,6 +33,25 @@ char *get_hash(const char *full_path) {
     return hash;
 }
 
+char *get_chunk_hash(const char *data) {
+    MD5_CTX md5_context;
+    unsigned char digest[MD5_DIGEST_LENGTH];
+    char *hash = malloc(2 * MD5_DIGEST_LENGTH + 1);
+
+    MD5_Init(&md5_context);
+
+    MD5_Update(&md5_context, data, strlen(data));
+
+    MD5_Final(digest, &md5_context);
+
+    // convert binary digest to a string
+    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+        sprintf(&hash[i * 2], "%02x", digest[i]);
+    }
+
+    return hash;
+}
+
 void verify(const char *hash_header, const char *hash_decmprs, const char *filename, const char *file_path, const char *output_dir_path) {
     if (strcmp(hash_decmprs, hash_header) != 0) {
         DIR *dir;
