@@ -15,6 +15,7 @@ This project focuses on the compression and decompression of large datasets and 
 - MPI
 - OpenMP
 - zlib
+- OpenSSL/MD5
 
 For MacOS, these can be installed using Homebrew. On Linux, they are available through package managers like apt-get.
 
@@ -23,7 +24,7 @@ Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not
 
 ### Compilation - Example
 ```
-mpicc -fopenmp file_process/file_sort.c main.c compression.c file_process/file_tools.c decompression.c -o main -lz
+mpicc -fopenmp file_process/file_sort.c main.c compression.c file_process/file_tools.c decompression.c verification.c -o main -lz -lssl -lcrypto
 ```
 ### Execution - Example
 ```
