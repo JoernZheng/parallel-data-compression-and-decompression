@@ -61,29 +61,12 @@ void destroy_semaphores(int world_rank) {
     sem_unlink(sem_name_empty);
 }
 
-// void data_writer(const char *filename, long compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest) {
-//     ChunkHeader header;
-//     strncpy(header.filename, filename, sizeof(header.filename) - 1);
-//     header.filename[sizeof(header.filename) - 1] = '\0'; // Ensure null-termination
-//     header.size = compressed_size;
-//     header.is_last = is_last;
-
-//     fwrite(&header, sizeof(header), 1, dest);
-//     fwrite(compressed_data, sizeof(unsigned char), compressed_size, dest);
-// }
-
 void data_writer(const char *filename, long compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest, char *full_path, char *data) {
     ChunkHeader header;
     strncpy(header.filename, filename, sizeof(header.filename) - 1);
     header.filename[sizeof(header.filename) - 1] = '\0'; // Ensure null-termination
     header.size = compressed_size;
     header.is_last = is_last;
-    // char *hash = get_hash(full_path);
-    // strncpy(header.hash_value, hash, sizeof(header.hash_value) - 1);
-    // header.hash_value[sizeof(header.hash_value) - 1] = '\0';
-    // printf("Hash value of %s: %s\n", filename, header.hash_value);
-
-    // printf("<<%s>> from %s\n: ", data, filename);
     
     // Calculate the hash value of each chunk and write it into the ChunkHeader
     char *chunk_hash = get_chunk_hash(data);
@@ -371,25 +354,22 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
     printf("Initialized semaphores in %d process\n", world_rank);
     printf("Max record line num: %d\n", max_record_line_num);
 
-    #pragma omp parallel sections
+    #pragma omp parallel
     {
-        #pragma omp critical
+        #pragma omp master
         {
             printf("Producer %d\n", world_rank);
             producer(input_dir, file_record, world_rank);
             printf("Producer %d finished\n", world_rank);
         }
 
-        #pragma omp section
-        {
+        #pragma omp barrier
+
+        #pragma omp for
+        for (int i = 0; i < NUM_CONSUMERS; ++i) {
             printf("Consumer %d\n", world_rank);
-            for (int i = 0; i < NUM_CONSUMERS; ++i) {
-                #pragma omp task
-                {
-                    consumer();
-                    printf("Consumer %d finished\n", i);
-                }
-            }
+            consumer();
+            printf("Consumer %d finished\n", i);
         }
     }
 

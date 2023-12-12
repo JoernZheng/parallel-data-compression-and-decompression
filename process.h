@@ -23,27 +23,12 @@ typedef struct {
     off_t size;
 } FileEntry;
 
-// typedef struct {
-//     char filename[255];
-//     long size;    // Size of the compressed file
-//     int is_last;    // If this is the last chunk of the file
-// } ChunkHeader;
-
 typedef struct {
     char filename[255];
     long size;    // Size of the compressed file
     int is_last;    // If this is the last chunk of the file
     char hash_value[2 * MD5_DIGEST_LENGTH + 1]; // hash value of the file before compressed
 } ChunkHeader;
-
-// typedef struct {
-//     int id;
-//     char filename[255];
-//     unsigned char data[CHUNK_SIZE];
-//     size_t size;
-//     int is_last_chunk;
-//     int is_last_file;
-// } Chunk;
 
 typedef struct {
     int id;
@@ -52,7 +37,6 @@ typedef struct {
     size_t size;
     int is_last_chunk;
     int is_last_file;
-    char full_path[1024]; //full path of each file for get_hash() function to calculate its hash value
 } Chunk;
 
 typedef struct {
