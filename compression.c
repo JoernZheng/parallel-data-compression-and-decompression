@@ -61,15 +61,15 @@ void destroy_semaphores(int world_rank) {
     sem_unlink(sem_name_empty);
 }
 
-void data_writer(const char *filename, long compressed_size, const unsigned char *compressed_data, int is_last, FILE *dest, char *full_path, char *data) {
+void data_writer(Chunk *chunk, long compressed_size, const unsigned char *compressed_data, FILE *dest) {
     ChunkHeader header;
-    strncpy(header.filename, filename, sizeof(header.filename) - 1);
+    strncpy(header.filename, chunk->filename, sizeof(header.filename) - 1);
     header.filename[sizeof(header.filename) - 1] = '\0'; // Ensure null-termination
     header.size = compressed_size;
-    header.is_last = is_last;
+    header.is_last = chunk->is_last_chunk;
     
     // Calculate the hash value of each chunk and write it into the ChunkHeader
-    char *chunk_hash = get_chunk_hash(data);
+    char *chunk_hash = get_chunk_hash(chunk);
     strncpy(header.hash_value, chunk_hash, sizeof(header.hash_value) - 1);
     header.hash_value[sizeof(header.hash_value) - 1] = '\0';
     // printf("Hash of this chunk from %s is: %s\n", full_path, chunk_hash);
@@ -140,8 +140,8 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
                 } else {
                     chunk.is_last_file = 0;
                 }
-                strncpy(chunk.full_path, full_path, sizeof(chunk.full_path) - 1);
-                chunk.full_path[sizeof(chunk.full_path) - 1] = '\0';
+//                strncpy(chunk.full_path, full_path, sizeof(chunk.full_path) - 1);
+//                chunk.full_path[sizeof(chunk.full_path) - 1] = '\0';
                 sem_wait(sem_queue_not_full);
                 omp_set_lock(&queue_lock);
                 queue[queue_tail] = chunk;
@@ -212,7 +212,7 @@ void consumer() {
             if (chunk.id == next_chunk_to_write) {
                 // char *hash = get_chunk_hash(chunk.data);
                 // printf("Chunk id: %d, hash value of this chunk from %s is: %s\n", chunk.id, chunk.filename, hash);
-                data_writer(chunk.filename, compressed_size, out, chunk.is_last_chunk, dest, chunk.full_path, chunk.data);
+                data_writer(&chunk, compressed_size, out, dest);
                 // printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
                 next_chunk_to_write++;
                 // printf("next_chunk_to_write: %d\n", next_chunk_to_write);
