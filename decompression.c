@@ -101,8 +101,8 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
 struct HashMap* generateFileNamePathMap(char* output_file_path) {
     FILE* sortSizeFile = fopen(output_file_path, "r");
     if (sortSizeFile == NULL) {
-        fprintf(stderr, "Error opening file.\n");
-        return 1;
+        fprintf(stderr, "Error opening sorted txt file.\n");
+        return NULL;
     }
 
     struct HashMap* filePathMap = createHashMap(HASHMAP_INIT_SIZE);
@@ -184,6 +184,10 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
 
     // Read sort size file
     struct HashMap* filePathMap = generateFileNamePathMap(output_file_path);
+    if (filePathMap == NULL) {
+        printf("filePathMap is NULL");
+        exit(-1);
+    }
 
     // Read subsequent headers
     while (fread(&header, sizeof(ChunkHeader), 1, fp) == 1) {
