@@ -23,7 +23,7 @@ typedef struct {
 
 typedef struct {
     char filename[255];
-    long size;    // Size of the compressed file
+    long size;    // Size of the compressed chunk
     int is_last;    // If this is the last chunk of the file
 } ChunkHeader;
 
