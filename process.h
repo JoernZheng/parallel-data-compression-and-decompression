@@ -43,10 +43,35 @@ typedef struct {
     int written; // 0: not written, 1: written
 } CompressedChunk;
 
+/*
+    Decompress Define
+*/
+// Node structure for the linked list in each hash table entry
+struct Node
+{
+    char *key;
+    char *value;
+    struct Node *next;
+};
+
+// Hash table structure
+struct HashMap
+{
+    int size;
+    struct Node **array;
+};
+
 char *sort_files_by_size(const char *path);
 void do_compression(const char *input_dir, const char *output_dir, const char *file_record, int world_rank);
 int count_non_empty_lines(const char *file_path);
 void extract_filename(char *filename, const char *filepath);
 void do_decompression(const char *source_path, const char *output_path);
+
+int calculateHash(char *key, int table_size);
+struct Node *createNode(char *key, char *value);
+struct HashMap *createHashMap(int size);
+void insert(struct HashMap *map, char *key, char *value);
+char *search(struct HashMap *map, char *key);
+void destroyHashMap(struct HashMap *map);
 
 #endif
