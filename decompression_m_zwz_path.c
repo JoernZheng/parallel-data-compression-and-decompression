@@ -107,27 +107,56 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         if (strrchr(line, '/') != NULL) {
             fileName = strrchr(line, '/') + 1;
             *strrchr(line, '/') = '\0';
-            filePath = line;
+            filePath = (char *)malloc(strlen(line) + 1);
+            filePath[0] = '/';
+            strcpy(filePath + 1, line);
         } else {
             fileName = line;
             filePath = "";
         }
         
-
-        // Insert the entry into the hashmap
-        // insertNode(hashmap, fileName, line);
-        // filePathMap
-        // insert(filePathMap, fileName, line);
+        insert(filePathMap, fileName, filePath);
         printf("%s: %s\n", fileName, filePath);
     }
-    
-
     fclose(sortSizeFile);
 
     // Read subsequent headers
     while (fread(&header, sizeof(ChunkHeader), 1, fp) == 1) {
         if (out_fp == NULL) {
-            snprintf(output_file_path, sizeof(output_file_path), "%s/%s", output_dir_path, header.filename);
+            // printf("%s\n", header.filename);
+            char* relativePath = search(filePathMap, header.filename);
+            
+            size_t fullPathSize = 0;
+            if (relativePath == NULL) {
+                fullPathSize = strlen(output_dir_path) + 1;
+            } else {
+                fullPathSize = strlen(output_dir_path) + strlen(relativePath) + 1;
+                printf("file name: %s, relativePath: %s\n", header.filename, relativePath);
+            }
+            char* fullPath = (char *)malloc(fullPathSize);
+            if (fullPath == NULL) {
+                fprintf(stderr, "fullPath Memory allocation failed\n");
+            }
+            strcpy(fullPath, output_dir_path);
+            if (relativePath != NULL) strcat(fullPath, relativePath);
+
+            struct stat st;
+            if (stat(fullPath, &st) == -1) {
+                // Directory doesn't exist, so create it
+                if (mkdir(fullPath, 0777) == 0) {
+                    printf("Directory created successfully: %s\n", fullPath);
+                } else {
+                    perror("Error creating directory");
+                    fclose(fp);
+                    return 1;
+                }
+            } else {
+                printf("Directory already exists: %s\n", fullPath);
+            }
+
+            snprintf(output_file_path, sizeof(output_file_path), "%s/%s", fullPath, header.filename);
+            printf("output_file_path: %s\n", output_file_path);
+            // snprintf(output_file_path, sizeof(output_file_path), "%s/%s", output_dir_path, header.filename);
             out_fp = fopen(output_file_path, "wb");
             if (!out_fp) {
                 fprintf(stderr, "Failed to open output file: %s\n", output_file_path);
