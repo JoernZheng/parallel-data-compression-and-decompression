@@ -52,6 +52,13 @@ int is_directory_empty(const char *path) {
     else return 0; // Directory not empty
 }
 
+void remove_trailing_slash(char *path) {
+    size_t length = strlen(path);
+    if (length > 0 && path[length - 1] == '/') {
+        path[length - 1] = '\0';  // Replace the last character with null terminator
+    }
+}
+
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
@@ -60,14 +67,23 @@ int main(int argc, char *argv[]) {
 
     // Check for correct usage
     if (argc < 4) {
-        printf("Usage: %s <compress/decompress> <folder path> <output_dir path>\n", argv[0]);
+        printf("Usage: %s <compress/decompress> <source directory path> <output directory path>\n", argv[0]);
         MPI_Abort(MPI_COMM_WORLD, 1);
         return 1;
     }
 
     const char *operation = argv[1];
-    const char *source_path = argv[2];
-    const char *output_path = argv[3];
+    char source_path[1024];
+    char output_path[1024];
+
+    strncpy(source_path, argv[2], sizeof(source_path) - 1);
+    source_path[sizeof(source_path) - 1] = '\0';  // Ensure null-terminated string
+    strncpy(output_path, argv[3], sizeof(output_path) - 1);
+    output_path[sizeof(output_path) - 1] = '\0';
+
+    // Remove trailing slash from paths
+    remove_trailing_slash(source_path);
+    remove_trailing_slash(output_path);
 
     if (world_rank == 0) {
         struct stat path_stat;
