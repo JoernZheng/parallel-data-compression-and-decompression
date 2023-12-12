@@ -65,3 +65,4 @@ dkms.conf
 cmake-build-debug/
 
 temp/*
+!temp/.gitkeep
