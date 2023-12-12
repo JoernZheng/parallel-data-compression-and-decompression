@@ -64,5 +64,5 @@ dkms.conf
 #CMakeLists.txt
 cmake-build-debug/
 
-temp/*
-!temp/.gitkeep
+tmp/*
+!tmp/.gitkeep
