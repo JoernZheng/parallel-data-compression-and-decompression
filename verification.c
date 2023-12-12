@@ -33,14 +33,14 @@ char *get_hash(const char *full_path) {
     return hash;
 }
 
-char *get_chunk_hash(const char *data) {
+char *get_chunk_hash(const Chunk *uncompressed_chunk) {
     MD5_CTX md5_context;
     unsigned char digest[MD5_DIGEST_LENGTH];
     char *hash = malloc(2 * MD5_DIGEST_LENGTH + 1);
 
     MD5_Init(&md5_context);
 
-    MD5_Update(&md5_context, data, strlen(data));
+    MD5_Update(&md5_context, uncompressed_chunk->data, uncompressed_chunk->size);
 
     MD5_Final(digest, &md5_context);
 
