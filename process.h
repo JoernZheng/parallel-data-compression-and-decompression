@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include <openssl/md5.h>
+#include <dirent.h>
 
 #define CHUNK_SIZE 65535
 #define QUEUE_SIZE 100
@@ -23,27 +24,12 @@ typedef struct {
     off_t size;
 } FileEntry;
 
-// typedef struct {
-//     char filename[255];
-//     long size;    // Size of the compressed file
-//     int is_last;    // If this is the last chunk of the file
-// } ChunkHeader;
-
 typedef struct {
     char filename[255];
     long size;    // Size of the compressed file
     int is_last;    // If this is the last chunk of the file
     char hash_value[2 * MD5_DIGEST_LENGTH + 1]; // hash value of the file before compressed
 } ChunkHeader;
-
-// typedef struct {
-//     int id;
-//     char filename[255];
-//     unsigned char data[CHUNK_SIZE];
-//     size_t size;
-//     int is_last_chunk;
-//     int is_last_file;
-// } Chunk;
 
 typedef struct {
     int id;
@@ -52,7 +38,6 @@ typedef struct {
     size_t size;
     int is_last_chunk;
     int is_last_file;
-    char full_path[1024]; //full path of each file for get_hash() function to calculate its hash value
 } Chunk;
 
 typedef struct {
@@ -68,7 +53,7 @@ int count_non_empty_lines(const char *file_path);
 void extract_filename(char *filename, const char *filepath);
 void do_decompression(const char *source_path, const char *output_path);
 char *get_hash(const char *full_path);
-char *get_chunk_hash(const char *data);
+char *get_chunk_hash(const Chunk *uncompressed_chunk);
 void verify(const char *hash_header, const char *hash_decmprs, const char *filename, const char *file_path, const char *output_dir_path);
 
 #endif
