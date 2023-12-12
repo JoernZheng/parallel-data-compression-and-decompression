@@ -52,6 +52,9 @@ int createDirectories(const char *path) {
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
+    if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
+        printf("Hash of this chunk from <%s> is: %s\n", header.filename, header.hash_value);
+    }
 
     // Initialize zlib decompression stream
     z_stream strm;
@@ -66,6 +69,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Allocate input and output buffers
     unsigned char in[CHUNK_SIZE + 1000];
     unsigned char out[CHUNK_SIZE + 1000];
+
     long remaining = header.size; // Remaining amount of compressed data
 
     // Read and decompress data
@@ -215,6 +219,11 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         if (header.is_last == 1) {
             fclose(out_fp);
             out_fp = NULL;
+            // compare the hash value after decompression to verify the correctness of decompression
+            char *hash = get_hash(output_file_path);
+            char *bad_dir = "../bad";
+            // verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
+            // printf("Hash of %s: %s and it's original hash value: %s\n", output_file_path, hash, header.hash_value);
         }
     }
     destroyHashMap(filePathMap);

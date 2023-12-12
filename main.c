@@ -23,7 +23,7 @@ void _compress(const char *folder_path, const char *output_path) {
     printf("main.c - Rank: %d - do_compression finished\n", world_rank);
 }
 
-void _decompress(const char *source_path, const char *output_path ) {
+void _decompress(const char *source_path, const char *output_path) {
     int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
