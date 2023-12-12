@@ -75,8 +75,12 @@ struct HashMap *createHashMap(int size)
 
 // Insert a key-value pair into the hash map
 void insert(struct HashMap *map, char *key, char *value)
-{
+{   
+    if (map->usedSize == map->size) {
+        resizeHashMap(struct HashMap *map);
+    }
     int index =  calculateHash(key, map->size);
+    map->usedSize++;
 
     struct Node *newNode = createNode(key, value);
     newNode->next = map->array[index];
@@ -99,6 +103,51 @@ char *search(struct HashMap *map, char *key)
     }
 
     return NULL; // Key not found
+}
+
+// Resize the hash map
+void resizeHashMap(struct HashMap *map)
+{
+    int new_size = map->size * HASHMAP_RESIZE_FACTOR;
+    struct Node **new_array = (struct Node **)malloc(sizeof(struct Node *) * new_size);
+    if (!new_array)
+    {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize each entry in the new hash table
+    for (int i = 0; i < new_size; ++i)
+    {
+        new_array[i] = NULL;
+    }
+
+    // Rehash all existing elements and insert into the new hash map
+    for (int i = 0; i < map->size; ++i)
+    {
+        struct Node *current = map->array[i];
+        while (current != NULL)
+        {
+            int new_index = calculateHash(current->key, new_size);
+
+            struct Node *new_node = createNode(current->key, current->value);
+            new_node->next = new_array[new_index];
+            new_array[new_index] = new_node;
+
+            struct Node *temp = current;
+            current = current->next;
+            free(temp->key);
+            free(temp->value);
+            free(temp);
+        }
+    }
+
+    // Free the old array
+    free(map->array);
+
+    // Update the hash map with the new array and size
+    map->array = new_array;
+    map->size = new_size;
 }
 
 // Free the memory allocated for the hash map

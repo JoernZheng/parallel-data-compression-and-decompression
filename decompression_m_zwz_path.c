@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAX_LINE_LENGTH 256
+
 
 int createDirectory(const char *path)
 {
@@ -137,9 +137,7 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         return 1;
     }
 
-    // Create a hashmap (array of linked lists)
-    // struct Node* hashmap[MAX_LINE_LENGTH] = {NULL};
-    struct HashMap* filePathMap = createHashMap(10);
+    struct HashMap* filePathMap = createHashMap(HASHMAP_INIT_SIZE);
 
     char line[MAX_LINE_LENGTH];
     while (fgets(line, sizeof(line), sortSizeFile) != NULL) {
@@ -169,7 +167,7 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     // Read subsequent headers
     while (fread(&header, sizeof(ChunkHeader), 1, fp) == 1) {
         if (out_fp == NULL) {
-            // printf("%s\n", header.filename);
+            // create file relative path
             char* relativePath = search(filePathMap, header.filename);
             
             size_t fullPathSize = 0;
@@ -177,24 +175,25 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
                 fullPathSize = strlen(output_dir_path) + 1;
             } else {
                 fullPathSize = strlen(output_dir_path) + strlen(relativePath) + 1;
-                printf("file name: %s, relativePath: %s\n", header.filename, relativePath);
             }
             char* fullPath = (char *)malloc(fullPathSize);
             if (fullPath == NULL) {
                 fprintf(stderr, "fullPath Memory allocation failed\n");
+                fclose(fp);
+                return;
             }
             strcpy(fullPath, output_dir_path);
             if (relativePath != NULL) strcat(fullPath, relativePath);
 
             // create non-existing directories
-            if (createDirectories(fullPath) == 0) {
-                printf("Directories created successfully: %s\n", fullPath);
+            if (createDirectories(fullPath) != 0) {
+                printf("Failed to create directories: %s\n", fullPath);
+                fclose(fp);
+                return;
             }
-            else printf("Failed to create directories\n");
 
+            // get the target file
             snprintf(output_file_path, sizeof(output_file_path), "%s/%s", fullPath, header.filename);
-            printf("output_file_path: %s\n", output_file_path);
-            // snprintf(output_file_path, sizeof(output_file_path), "%s/%s", output_dir_path, header.filename);
             out_fp = fopen(output_file_path, "wb");
             if (!out_fp) {
                 fprintf(stderr, "Failed to open output file: %s\n", output_file_path);
