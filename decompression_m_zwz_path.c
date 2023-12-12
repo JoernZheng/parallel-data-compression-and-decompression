@@ -6,6 +6,52 @@
 
 #define MAX_LINE_LENGTH 256
 
+int createDirectory(const char *path)
+{
+    struct stat st;
+
+    // Check if the directory already exists
+    if (stat(path, &st) == -1)
+    {
+        // Directory doesn't exist, so create it
+        if (mkdir(path, 0777) != 0)
+        {
+            perror("Error creating directory");
+            return 1; // Return an error code
+        }
+    }
+
+    return 0; // Return success
+}
+
+int createDirectories(const char *path)
+{
+    char *pathCopy = strdup(path);
+    char *token = strtok(pathCopy, "/");
+    char currentPath[1024];
+
+    strcpy(currentPath, token);
+
+    while (token != NULL)
+    {
+        if (createDirectory(currentPath) != 0)
+        {
+            free(pathCopy);
+            return 1; // Return an error code
+        }
+
+        token = strtok(NULL, "/");
+        if (token != NULL)
+        {
+            strcat(currentPath, "/");
+            strcat(currentPath, token);
+        }
+    }
+
+    free(pathCopy);
+    return 0; // Return success
+}
+
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
 
@@ -140,19 +186,11 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
             strcpy(fullPath, output_dir_path);
             if (relativePath != NULL) strcat(fullPath, relativePath);
 
-            struct stat st;
-            if (stat(fullPath, &st) == -1) {
-                // Directory doesn't exist, so create it
-                if (mkdir(fullPath, 0777) == 0) {
-                    printf("Directory created successfully: %s\n", fullPath);
-                } else {
-                    perror("Error creating directory");
-                    fclose(fp);
-                    return 1;
-                }
-            } else {
-                printf("Directory already exists: %s\n", fullPath);
+            // create non-existing directories
+            if (createDirectories(fullPath) == 0) {
+                printf("Directories created successfully: %s\n", fullPath);
             }
+            else printf("Failed to create directories\n");
 
             snprintf(output_file_path, sizeof(output_file_path), "%s/%s", fullPath, header.filename);
             printf("output_file_path: %s\n", output_file_path);
