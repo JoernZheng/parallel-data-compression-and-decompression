@@ -77,7 +77,7 @@ struct HashMap *createHashMap(int size)
 void insert(struct HashMap *map, char *key, char *value)
 {   
     if (map->usedSize == map->size) {
-        resizeHashMap(struct HashMap *map);
+        resizeHashMap(map);
     }
     int index =  calculateHash(key, map->size);
     map->usedSize++;

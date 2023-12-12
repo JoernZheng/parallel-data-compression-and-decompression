@@ -1,5 +1,54 @@
 #include "process.h"
 #include <dirent.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+
+
+int createDirectory(const char *path) {
+    struct stat st;
+
+    // Check if the directory already exists
+    if (stat(path, &st) == -1)
+    {
+        // Directory doesn't exist, so create it
+        if (mkdir(path, 0777) != 0)
+        {
+            perror("Error creating directory");
+            return 1; // Return an error code
+        }
+    }
+
+    return 0; // Return success
+}
+
+int createDirectories(const char *path) {
+    char *pathCopy = strdup(path);
+    char *token = strtok(pathCopy, "/");
+    char currentPath[1024];
+
+    strcpy(currentPath, token);
+
+    while (token != NULL)
+    {
+        if (createDirectory(currentPath) != 0)
+        {
+            free(pathCopy);
+            return 1; // Return an error code
+        }
+
+        token = strtok(NULL, "/");
+        if (token != NULL)
+        {
+            strcat(currentPath, "/");
+            strcat(currentPath, token);
+        }
+    }
+
+    free(pathCopy);
+    return 0; // Return success
+}
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
@@ -49,6 +98,60 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     inflateEnd(&strm);
 }
 
+struct HashMap* generateFileNamePathMap(char* output_file_path) {
+    FILE* sortSizeFile = fopen(output_file_path, "r");
+    if (sortSizeFile == NULL) {
+        fprintf(stderr, "Error opening file.\n");
+        return 1;
+    }
+
+    struct HashMap* filePathMap = createHashMap(HASHMAP_INIT_SIZE);
+
+    char line[MAX_LINE_LENGTH];
+    while (fgets(line, sizeof(line), sortSizeFile) != NULL) {
+        // Remove trailing newline character
+        line[strcspn(line, "\n")] = '\0';
+
+        // Split the line into path and file name
+        *(strrchr(line, '(') - 1) = '\0';
+        char* fileName;
+        char* filePath;
+        if (strrchr(line, '/') != NULL) {
+            fileName = strrchr(line, '/') + 1;
+            *strrchr(line, '/') = '\0';
+            filePath = (char *)malloc(strlen(line) + 1);
+            filePath[0] = '/';
+            strcpy(filePath + 1, line);
+        } else {
+            fileName = line;
+            filePath = "";
+        }
+        
+        insert(filePathMap, fileName, filePath);
+    }
+    fclose(sortSizeFile);
+    return filePathMap;
+}
+
+char* generateFullPath(const char *output_dir_path, struct HashMap* filePathMap, ChunkHeader header) {
+    char* relativePath = search(filePathMap, header.filename);
+            
+    size_t fullPathSize = 0;
+    if (relativePath == NULL) {
+        fullPathSize = strlen(output_dir_path) + 1;
+    } else {
+        fullPathSize = strlen(output_dir_path) + strlen(relativePath) + 1;
+    }
+    char* fullPath = (char *)malloc(fullPathSize);
+    if (fullPath == NULL) {
+        fprintf(stderr, "fullPath Memory allocation failed\n");
+        return NULL;
+    }
+    strcpy(fullPath, output_dir_path);
+    if (relativePath != NULL) strcat(fullPath, relativePath);
+    return fullPath;
+}
+
 void decompress_zwz(const char *file_path, const char *output_dir_path) {
     FILE *fp = fopen(file_path, "rb");
     if (!fp) {
@@ -79,10 +182,27 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     fclose(out_fp);
     out_fp = NULL;
 
+    // Read sort size file
+    struct HashMap* filePathMap = generateFileNamePathMap(output_file_path);
+
     // Read subsequent headers
     while (fread(&header, sizeof(ChunkHeader), 1, fp) == 1) {
         if (out_fp == NULL) {
-            snprintf(output_file_path, sizeof(output_file_path), "%s/%s", output_dir_path, header.filename);
+            char* fullPath = generateFullPath(output_dir_path, filePathMap, header);
+            if (fullPath == NULL){
+                fclose(fp);
+                return;
+            }
+
+            // create non-existing directories
+            if (createDirectories(fullPath) != 0) {
+                printf("Failed to create directories: %s\n", fullPath);
+                fclose(fp);
+                return;
+            }
+
+            // get the target file
+            snprintf(output_file_path, sizeof(output_file_path), "%s/%s", fullPath, header.filename);
             out_fp = fopen(output_file_path, "wb");
             if (!out_fp) {
                 fprintf(stderr, "Failed to open output file: %s\n", output_file_path);
@@ -97,24 +217,60 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
             out_fp = NULL;
         }
     }
+    destroyHashMap(filePathMap);
 }
 
 void do_decompression(const char *source_dir_path, const char *output_dir_path) {
     // Step 1: Iterate through all files in the source directory, only deal with .zwz files
     DIR *dir;
     struct dirent *ent;
-    if ((dir = opendir(source_dir_path)) != NULL) {
-        while ((ent = readdir(dir)) != NULL) {
-            // Check if the file extension is .zwz
-            if (strstr(ent->d_name, ".zwz") != NULL) {
-                char file_path[1024];
-                snprintf(file_path, sizeof(file_path), "%s/%s", source_dir_path, ent->d_name);
-                // Step 2: Process each .zwz file
-                decompress_zwz(file_path, output_dir_path);
+    int readEnd = 0;
+    // char* d_name_copy;
+
+    dir = opendir(source_dir_path);
+    if (dir == NULL) perror("Could not open source directory");
+    else {
+        // multi-threads decompressing .zwz files
+        #pragma omp parallel 
+        {
+            char* d_name_copy;
+
+            // update ent and d_name_copy
+            #pragma omp critial 
+            {
+                ent = readdir(dir);
+                if (ent == NULL) {
+                    readEnd = 1;
+                } else {
+                    d_name_copy = (char *)malloc(strlen(ent->d_name) + 1);
+                    strcpy(d_name_copy, ent->d_name);
+                }
+            }
+
+            while (!readEnd){
+                if (strstr(d_name_copy, ".zwz") != NULL) {
+                    char file_path[1024];
+                    snprintf(file_path, sizeof(file_path), "%s/%s", source_dir_path, d_name_copy);
+                    // Step 2: Process each .zwz file
+                    decompress_zwz(file_path, output_dir_path);
+                }
+                free(d_name_copy);
+                // update ent and d_name_copy
+                #pragma omp critial 
+                {
+                    ent = readdir(dir);
+                    if (ent == NULL) {
+                        readEnd = 1;
+                    } else {
+                        d_name_copy = (char *)malloc(strlen(ent->d_name) + 1);
+                        strcpy(d_name_copy, ent->d_name);
+                    }
+                }
             }
         }
         closedir(dir);
-    } else {
-        perror("Could not open source directory");
     }
 }
+
+
+

@@ -76,7 +76,7 @@ struct Node *createNode(char *key, char *value);
 struct HashMap *createHashMap(int size);
 void insert(struct HashMap *map, char *key, char *value);
 char *search(struct HashMap *map, char *key);
-void resizeHashMap(struct HashMap *map, int new_size);
+void resizeHashMap(struct HashMap *map);
 void destroyHashMap(struct HashMap *map);
 
 #endif
