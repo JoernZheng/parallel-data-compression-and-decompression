@@ -1,22 +1,4 @@
 #include "process.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-// Node structure for the linked list in each hash table entry
-// struct Node
-// {
-//     char *key;
-//     char *value;
-//     struct Node *next;
-// };
-
-// // Hash table structure
-// struct HashMap
-// {
-//     int size;
-//     struct Node **array;
-// };
 
 // Hash function
 int  calculateHash(char *key, int table_size)

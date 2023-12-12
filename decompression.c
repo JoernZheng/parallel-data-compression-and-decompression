@@ -1,9 +1,5 @@
 #include "process.h"
 #include <dirent.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 
 
 int createDirectory(const char *path) {
@@ -245,7 +241,7 @@ void do_decompression(const char *source_dir_path, const char *output_dir_path) 
             char* d_name_copy;
 
             // update ent and d_name_copy
-            #pragma omp critial 
+            #pragma omp critical 
             {
                 ent = readdir(dir);
                 if (ent == NULL) {
@@ -265,7 +261,7 @@ void do_decompression(const char *source_dir_path, const char *output_dir_path) 
                 }
                 free(d_name_copy);
                 // update ent and d_name_copy
-                #pragma omp critial 
+                #pragma omp critical 
                 {
                     ent = readdir(dir);
                     if (ent == NULL) {
