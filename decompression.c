@@ -1,6 +1,7 @@
 #include "process.h"
 #include <dirent.h>
 
+struct HashMap* filePathMap;
 
 int createDirectory(const char *path) {
     struct stat st;
@@ -46,11 +47,12 @@ int createDirectories(const char *path) {
     return 0; // Return success
 }
 
-void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
+int decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
     if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
         printf("Hash of this chunk from <%s> is: %s\n", header.filename, header.hash_value);
     }
+    int hashMatch = 0;
 
     // Initialize zlib decompression stream
     z_stream strm;
@@ -96,6 +98,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
 
     // Clean up zlib stream
     inflateEnd(&strm);
+    return hashMatch;
 }
 
 struct HashMap* generateFileNamePathMap(char* output_file_path) {
@@ -178,21 +181,31 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     }
 
     // The header.is_last of the first file must be 1
-    decompress_file(fp, out_fp, header);
+    int hashMatch = decompress_file(fp, out_fp, header);
     fclose(out_fp);
     out_fp = NULL;
+    // compare the hash value after decompression to verify the correctness of decompression
+    char *hash = get_hash(output_file_path);
+    char* bad_dir_name = "bad";
+    size_t bad_dir_len = strlen(fullPath) + 1 + strlen(bad_dir_name) + 1;
+    char *bad_dir = (char*)malloc(bad_dir_len);
+    snprintf(bad_dir, strlen(bad_dir), "%s/%s", output_dir_path, bad_dir_name);
+    
+    verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
 
     // Read sort size file
-    struct HashMap* filePathMap = generateFileNamePathMap(output_file_path);
+    filePathMap = generateFileNamePathMap(output_file_path);
     if (filePathMap == NULL) {
-        printf("filePathMap is NULL");
+        printf("filePathMap is NULL\n");
         exit(-1);
     }
 
+    char* fullPath;
     // Read subsequent headers
     while (fread(&header, sizeof(ChunkHeader), 1, fp) == 1) {
+        
         if (out_fp == NULL) {
-            char* fullPath = generateFullPath(output_dir_path, filePathMap, header);
+            fullPath = generateFullPath(output_dir_path, filePathMap, header);
             if (fullPath == NULL){
                 fclose(fp);
                 return;
@@ -220,12 +233,17 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
             fclose(out_fp);
             out_fp = NULL;
             // compare the hash value after decompression to verify the correctness of decompression
-            char *hash = get_hash(output_file_path);
-            char *bad_dir = "../bad";
-            // verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
-            // printf("Hash of %s: %s and it's original hash value: %s\n", output_file_path, hash, header.hash_value);
+            hash = get_hash(output_file_path);
+            bad_dir_name = "bad";
+            size_t bad_dir_len = strlen(fullPath) + 1 + strlen(bad_dir_name) + 1;
+            bad_dir = (char*)malloc(bad_dir_len);
+            snprintf(bad_dir, bad_dir_len, "%s/%s", fullPath, bad_dir_name);
+            
+            verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
+            
         }
     }
+    free(bad_dir);
     destroyHashMap(filePathMap);
 }
 
@@ -234,7 +252,6 @@ void do_decompression(const char *source_dir_path, const char *output_dir_path) 
     DIR *dir;
     struct dirent *ent;
     int readEnd = 0;
-    // char* d_name_copy;
 
     dir = opendir(source_dir_path);
     if (dir == NULL) perror("Could not open source directory");
@@ -280,6 +297,3 @@ void do_decompression(const char *source_dir_path, const char *output_dir_path) 
         closedir(dir);
     }
 }
-
-
-
