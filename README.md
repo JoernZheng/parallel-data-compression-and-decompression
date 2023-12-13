@@ -65,14 +65,13 @@ STEP 1: Add verification information (MD5 hash value) for each file chunk to the
 STEP 2: After decompression, calculate the verification information from the decompressed content and compare it with the header's verification information. If there's a mismatch, indicating file corruption, the file will be moved to an error folder; otherwise, it will be moved to the correct folder.
 ![Verification Process](pictures/csci596-validation.png)
 
-## Benchmarking
+## Benchmark
 ### Compression
-![Compression Benchmark](pictures/csci596-preformance.png)
-
-This is a preliminary testing, we will add more data in the future.
+![Compression Benchmark](pictures/csci596-performance_compression.png)
+### Decompression
 
 ## Contributions
-- Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking.
-- Yuhui Wu: File decompression, benchmarking.
-- Mianzhi Zhu: File verification, benchmarking.
+- Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking, Readme Doc.
+- Yuhui Wu: File decompression.
+- Mianzhi Zhu: File verification, Readme Doc.
 
