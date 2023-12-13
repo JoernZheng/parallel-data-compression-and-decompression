@@ -60,7 +60,7 @@ STEP 3: Decompress the file chunk and write the decompressed content to the outp
 
 ### Verification
 
-STEP 1: Add verification information for each file chunk to the header during the compression process, calculated from the file content.
+STEP 1: Add verification information (MD5 hash value) for each file chunk to the header during the compression process, calculated from the file content.
 
 STEP 2: After decompression, calculate the verification information from the decompressed content and compare it with the header's verification information. If there's a mismatch, indicating file corruption, the file will be moved to an error folder; otherwise, it will be moved to the correct folder.
 ![Verification Process](pictures/csci596-validation.png)
