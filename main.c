@@ -45,7 +45,7 @@ int is_directory_empty(const char *path) {
     DIR *dir = opendir(path);
 
     while ((d = readdir(dir)) != NULL) {
-        if(++n > 2) break;
+        if (++n > 2) break;
     }
     closedir(dir);
     if (n <= 2) return 1; // Directory Empty
@@ -87,16 +87,44 @@ int main(int argc, char *argv[]) {
 
     if (world_rank == 0) {
         struct stat path_stat;
-        // Check if source path is a directory
-        if (stat(source_path, &path_stat) != 0 || !S_ISDIR(path_stat.st_mode)) {
-            printf("Source path is not a directory.\n");
+
+        // Check if source path exists
+        if (stat(source_path, &path_stat) != 0) {
+            printf("Source path does not exist.\n");
             return 1;
         }
 
-        // Check if source directory is empty
-        if (is_directory_empty(source_path)) {
-            printf("Source directory is empty.\n");
-            return 1;
+        // Check if source path is a directory
+        if (S_ISDIR(path_stat.st_mode)) {
+            // Check if source directory is empty
+            if (is_directory_empty(source_path)) {
+                printf("Source directory is empty.\n");
+                return 1;
+            }
+        } else {
+            // source_path is not a directory, assume it's a file
+            printf("Source path is not a directory.\n");
+            printf("Assuming it's a file.\n");
+
+            // Create a new folder named based on the file name
+            char new_folder_path[1024];
+            snprintf(new_folder_path, sizeof(new_folder_path), "%s_folder", source_path);
+            printf("new_folder_path: %s\n", new_folder_path);
+            mkdir(new_folder_path, 0777);
+
+            // Construct new file path in the new folder
+            char new_file_path[2048];
+            char filename[1024];
+            extract_filename(filename, source_path);
+            snprintf(new_file_path, sizeof(new_file_path), "%s/%s", new_folder_path, filename);
+            printf("filename: %s\n", filename);
+            printf("new_file_path: %s\n", new_file_path);
+
+            // Move the file to the new folder
+            rename(source_path, new_file_path);
+
+            // Update source_path to point to the new folder
+            strncpy(source_path, new_folder_path, sizeof(source_path));
         }
 
         // Check if output path exists
@@ -131,5 +159,5 @@ int main(int argc, char *argv[]) {
 }
 
 // TODOs:
-// - Add file compression branch
+// - Clean tmp folder after compression + Refactor Code
 // - Fix the issue when the count of files is less than the process count
