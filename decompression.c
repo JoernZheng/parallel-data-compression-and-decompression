@@ -102,7 +102,7 @@ struct HashMap* generateFileNamePathMap(char* output_file_path) {
     FILE* sortSizeFile = fopen(output_file_path, "r");
     if (sortSizeFile == NULL) {
         fprintf(stderr, "Error opening file.\n");
-        return 1;
+        return NULL;
     }
 
     struct HashMap* filePathMap = createHashMap(HASHMAP_INIT_SIZE);
