@@ -1,9 +1,11 @@
 #include "process.h"
 
 void _compress(const char *folder_path, const char *output_path) {
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    int world_rank, world_size;
     char file_record_path[1024];
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
     // Step 1: Sort files by size and record them
     if (world_rank == 0) {
@@ -18,8 +20,15 @@ void _compress(const char *folder_path, const char *output_path) {
     // Step 2: Broadcast file_record_path to all processes
     MPI_Bcast(file_record_path, sizeof(file_record_path), MPI_CHAR, 0, MPI_COMM_WORLD);
 
+    int file_count = count_non_empty_lines(file_record_path);
+
     // Step 3: Compress files
-    do_compression(folder_path, output_path, file_record_path, world_rank);
+    if (world_rank < file_count) {
+        do_compression(folder_path, output_path, file_record_path, world_rank);
+    } else {
+        printf("Rank: %d - No file to compress\n", world_rank);
+    }
+
     printf("main.c - Rank: %d - do_compression finished\n", world_rank);
 }
 
@@ -160,4 +169,3 @@ int main(int argc, char *argv[]) {
 
 // TODOs:
 // - Clean tmp folder after compression + Refactor Code
-// - Fix the issue when the count of files is less than the process count
