@@ -51,28 +51,29 @@ STEP 3: Implement parallelism using **OpenMP** by designing the compression proc
 
 ### Decompression
 
-STEP 1: Use OpenMP's multithreading to parallel assign different file segments to various decompression threads.
+STEP 1: Use OpenMP's multithreading to parallelize the assignment of different .zwz files to different decompression threads.
 
-STEP 2: Process involves reading a fixed-length header from the stream, extracting the corresponding file chunk based on the header information.
+STEP 2: Read the first file, sorted_files_by_size.txt, and then generate a hash map with file name - file path pairs.
 
-STEP 3: Decompress the file chunk and write the decompressed content to the output stream.
+STEP 3: Read subsequent file chunks. The process involves reading a fixed-length header from the stream, extracting the corresponding file chunk based on the header information, decompressing each one, and then verifying the hash value.
+
+STEP 4: If the hash value is the same as in the compressed file, write the file to the correct location. Otherwise, write the file to the "[relative path]/bad" directory.
 ![Decompression Process](pictures/csci596-decompression.png)
 
 ### Verification
 
-STEP 1: Add verification information for each file chunk to the header during the compression process, calculated from the file content.
+STEP 1: Add verification information (MD5 hash value) for each file chunk to the header during the compression process, calculated from the file content.
 
 STEP 2: After decompression, calculate the verification information from the decompressed content and compare it with the header's verification information. If there's a mismatch, indicating file corruption, the file will be moved to an error folder; otherwise, it will be moved to the correct folder.
 ![Verification Process](pictures/csci596-validation.png)
 
-## Benchmarking
+## Benchmark
 ### Compression
-![Compression Benchmark](pictures/csci596-preformance.png)
-
-This is a preliminary testing, we will add more data in the future.
+![Compression Benchmark](pictures/csci596-performance_compression.png)
+### Decompression
 
 ## Contributions
-- Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking.
-- Yuhui Wu: File decompression, benchmarking.
-- Mianzhi Zhu: File verification, benchmarking.
+- Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking, Readme Doc.
+- Yuhui Wu: File decompression.
+- Mianzhi Zhu: File verification, Readme Doc.
 
