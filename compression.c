@@ -149,7 +149,7 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
                 omp_unset_lock(&queue_lock);
                 sem_post(sem_queue_not_empty);
 
-                printf("Rank: %d, Thread: %d - Produced chunk %d\n", world_rank, omp_get_thread_num(), chunk_number - 1);
+                // printf("Rank: %d, Thread: %d - Produced chunk %d\n", world_rank, omp_get_thread_num(), chunk_number - 1);
             }
 
             fclose(source);
@@ -176,7 +176,7 @@ void consumer() {
 
         omp_set_lock(&queue_lock);
         Chunk chunk = queue[queue_head];
-        printf("Chunk id: %d, is_last_file: %d, is_last_chunk: %d, filename: %s\n", chunk.id, chunk.is_last_file, chunk.is_last_chunk, chunk.filename);
+        // printf("Chunk id: %d, is_last_file: %d, is_last_chunk: %d, filename: %s\n", chunk.id, chunk.is_last_file, chunk.is_last_chunk, chunk.filename);
         if (chunk.is_last_file && chunk.is_last_chunk) {
             final_chunk_processed = 1;
         }
@@ -193,8 +193,8 @@ void consumer() {
 
         strm.avail_in = chunk.size;
         strm.next_in = chunk.data;
-        unsigned char out[CHUNK_SIZE + 1000];
-        strm.avail_out = CHUNK_SIZE + 1000;
+        unsigned char out[CHUNK_SIZE];
+        strm.avail_out = CHUNK_SIZE];
         strm.next_out = out;
 
         // deflate(&strm, chunk.is_last_chunk ? Z_FINISH : Z_NO_FLUSH);
@@ -216,7 +216,7 @@ void consumer() {
                 // printf("Chunk id: %d, next_chunk_to_write: %d\n", chunk.id, next_chunk_to_write);
                 next_chunk_to_write++;
                 // printf("next_chunk_to_write: %d\n", next_chunk_to_write);
-                printf("Write data for chunk %d, filename: %s\n", chunk.id, chunk.filename);
+                // printf("Write data for chunk %d, filename: %s\n", chunk.id, chunk.filename);
                 omp_unset_lock(&write_lock);
                 break;
             }
@@ -225,11 +225,11 @@ void consumer() {
 
         #pragma omp atomic
         ++processed_chunk_count;
-        printf("Rank: %d, Thread: %d - Compressed chunk %d\n", mpi_proc_rank, omp_get_thread_num(), processed_chunk_count);
+        // printf("Rank: %d, Thread: %d - Compressed chunk %d\n", mpi_proc_rank, omp_get_thread_num(), processed_chunk_count);
 
         if (final_chunk_processed && chunk.is_last_chunk) {
             for (int i = 0; i < omp_get_num_threads() - 1; ++i) {
-                printf("Rank: %d, Thread: %d - Send signals to unlock blocked threads\n", mpi_proc_rank, omp_get_thread_num());
+                // printf("Rank: %d, Thread: %d - Send signals to unlock blocked threads\n", mpi_proc_rank, omp_get_thread_num());
                 sem_post(sem_queue_not_empty);
             }
         }
@@ -354,22 +354,44 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
     printf("Initialized semaphores in %d process\n", world_rank);
     printf("Max record line num: %d\n", max_record_line_num);
 
-    #pragma omp parallel
+//    #pragma omp parallel
+//    {
+//        #pragma omp master
+//        {
+//            // printf("Producer %d\n", world_rank);
+//            producer(input_dir, file_record, world_rank);
+//            // printf("Producer %d finished\n", world_rank);
+//        }
+//
+//        #pragma omp barrier
+//
+//        #pragma omp for
+//        for (int i = 0; i < NUM_CONSUMERS; ++i) {
+//            // printf("Consumer %d\n", world_rank);
+//            consumer();
+//            // printf("Consumer %d finished\n", i);
+//        }
+//    }
+
+    #pragma omp parallel sections
     {
-        #pragma omp master
+        #pragma omp critical
         {
-            printf("Producer %d\n", world_rank);
+//            printf("Producer %d\n", world_rank);
             producer(input_dir, file_record, world_rank);
-            printf("Producer %d finished\n", world_rank);
+//            printf("Producer %d finished\n", world_rank);
         }
 
-        #pragma omp barrier
-
-        #pragma omp for
-        for (int i = 0; i < NUM_CONSUMERS; ++i) {
-            printf("Consumer %d\n", world_rank);
-            consumer();
-            printf("Consumer %d finished\n", i);
+        #pragma omp section
+        {
+//            printf("Consumer %d\n", world_rank);
+            for (int i = 0; i < NUM_CONSUMERS; ++i) {
+                #pragma omp task
+                {
+                    consumer();
+//                    printf("Consumer %d finished\n", i);
+                }
+            }
         }
     }
 

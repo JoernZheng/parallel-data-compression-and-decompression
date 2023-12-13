@@ -71,8 +71,11 @@ void remove_trailing_slash(char *path) {
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
-    int world_rank;
+    double start_time = MPI_Wtime(); // Start the timer
+
+    int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
     // Check for correct usage
     if (argc < 4) {
@@ -163,9 +166,19 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double end_time = MPI_Wtime(); // Stop the timer
+
+    if (world_rank == 0) {
+        double total_time = end_time - start_time;
+        printf("========================================\n");
+        printf("Operation: %s\n", operation);
+        printf("Processor Count: %d\n", world_size);
+        printf("Time Taken: %f seconds\n", total_time);
+        printf("========================================\n");
+    }
+
     MPI_Finalize();
     return 0;
 }
-
-// TODOs:
-// - Clean tmp folder after compression + Refactor Code
