@@ -146,6 +146,7 @@ Implement parallelism using **OpenMP** by designing the compression process as a
 ### Decompression
 
 **Step 1**
+
 Use OpenMP's multithreading to parallel assign different file segments to various decompression threads.
 
 **Step 2**
