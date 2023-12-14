@@ -117,37 +117,60 @@ mpicc -fopenmp file_process/file_sort.c main.c compression.c hashmap.c file_proc
 ```
 
 ## Implementation
-In this project, we primarily utilized C, MPI, and OpenMP, implementing three main functionalities: compression, decompression, and verification.
+
+In this project, we primarily utilized C, MPI (Message Passing Interface), OpenMP, and the DEFLATE algorithm for 
+compression and decompression. Our implementation focused on three core functionalities: **Compression**, **Decompression**, **Verification**.
 
 ### Compression
 
-STEP 1: Read all files in the source directory, sort them in descending order by size, and save the result to a local text file (sorted_file_by_size.txt).
+**Step 1**
 
-STEP 2: Use **MPI** to distribute files to different cores, with each core responsible for compressing a portion of the files.
+Read all files in the source directory, sort them in descending order by size, and save the result to a local text file (sorted_file_by_size.txt).
+
+**Step 2**
+
+Use **MPI** to distribute files to different cores, with each core responsible for compressing a portion of the files.
 This distribution strategy is similar to the PI calculation in the course, where files are assigned to different cores in sequence.
+
 For example, with two cores, the first core compresses the 1st, 3rd, 5th, 7th, 9th... files, while the second core compresses the 2nd, 4th, 6th, 8th, 10th... files.
 This strategy helps balance the compression load across different cores.
+
 ![Compression Process](pictures/csci596-compression.png)
 
-STEP 3: Implement parallelism using **OpenMP** by designing the compression process as a **producer-consumer model**. The producer runs in a single thread, responsible for reading files and placing file chunks into the processing queue. The consumer runs in multiple threads, taking file chunks from the queue for compression and writing them to the output stream.
+**Step 3**
+
+Implement parallelism using **OpenMP** by designing the compression process as a **producer-consumer model**. The producer runs in a single thread, responsible for reading files and placing file chunks into the processing queue. The consumer runs in multiple threads, taking file chunks from the queue for compression and writing them to the output stream.
+
 ![Producer-Consumer Model](pictures/csci596-producer-and-worker.png)
 
 ### Decompression
+**Step 1**
 
-STEP 1: Use OpenMP's multithreading to parallelize the assignment of different .zwz files to different decompression threads.
+Use OpenMP's multithreading to parallelize the assignment of different .zwz files to different decompression threads.
 
-STEP 2: Read the first file, sorted_files_by_size.txt, and then generate a hash map with file name - file path pairs.
+**Step 2**
 
-STEP 3: Read subsequent file chunks. The process involves reading a fixed-length header from the stream, extracting the corresponding file chunk based on the header information, decompressing each one, and then verifying the hash value.
+Read the first file, sorted_files_by_size.txt, and then generate a hash map with file name - file path pairs.
 
-STEP 4: If the hash value is the same as in the compressed file, write the file to the correct location. Otherwise, write the file to the "[relative path]/bad" directory.
+**Step 3**
+
+Read subsequent file chunks. The process involves reading a fixed-length header from the stream, extracting the corresponding file chunk based on the header information, decompressing each one, and then verifying the hash value.
+
+**Step 4**
+
+If the hash value is the same as in the compressed file, write the file to the correct location. Otherwise, write the file to the `[relative path]/bad` directory.
+
 ![Decompression Process](pictures/csci596-decompression.png)
 
 ### Verification
+**Step 1**
 
-STEP 1: Add verification information (MD5 hash value) for each file chunk to the header during the compression process, calculated from the file content.
+Add verification information (MD5 hash value) for each file chunk to the header during the compression process, calculated from the file content.
 
-STEP 2: After decompression, calculate the verification information from the decompressed content and compare it with the header's verification information. If there's a mismatch, indicating file corruption, the file will be moved to an error folder; otherwise, it will be moved to the correct folder.
+**Step 2**
+
+After decompression, calculate the verification information from the decompressed content and compare it with the header's verification information. If there's a mismatch, indicating file corruption, the file will be moved to an error folder; otherwise, it will be moved to the correct folder.
+
 ![Verification Process](pictures/csci596-validation.png)
 
 ## Benchmark
@@ -158,5 +181,5 @@ STEP 2: After decompression, calculate the verification information from the dec
 ## Contributions
 - Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking, Readme Doc.
 - Yuhui Wu: File decompression.
-- Mianzhi Zhu: File verification, Readme Doc.
+- Mianzhi Zhu: File verification and integration, Readme Doc.
 
