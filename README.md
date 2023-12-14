@@ -56,7 +56,6 @@ mpicc -fopenmp \
 
 **3. Run the Compression Program**
 ```
-```bash
 mpirun -n 2 main compress <source_directory> <output_directory>
 ```
 - Use `compress` to do compression.
