@@ -224,7 +224,7 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         decompress_file(fp, out_fp, header);
         if (header.is_last == 1) {
             if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
-                printf("Decompressing file: %s, is_last: %d, size: %ld\n", header.filename, header.is_last, header.size);
+                printf("Decompressing file: %s, is_last: %d, size: %d\n", header.filename, header.is_last, header.size);
                 // printf("Hash: %s\n", header.hash_value);
             }
             fclose(out_fp);
