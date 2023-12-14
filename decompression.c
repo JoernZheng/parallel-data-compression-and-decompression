@@ -95,10 +95,10 @@ int decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
             fwrite(out, 1, have, out_fp);
 
             Chunk decompressedChunk;
-            decompressedChunk.data = out;
-            // strncpy(decompressedChunk.data, out, have);
-            // decompressedChunk.data[have] = '\0';
-            // decompressedChunk.size = have + 1;
+            // decompressedChunk.data = out;
+            strncpy(decompressedChunk.data, out, have);
+            decompressedChunk.data[have] = '\0';
+            decompressedChunk.size = have + 1;
 
             // decompressedChunk.size = have;
             
