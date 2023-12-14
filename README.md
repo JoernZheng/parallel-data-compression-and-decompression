@@ -41,35 +41,36 @@ brew install gcc openmp libomp openssl@3
 **2. Compile the Program**
 ```
 mpicc -fopenmp \
--I/opt/homebrew/opt/openssl@3/include \
--L/opt/homebrew/opt/openssl@3/lib \
-main.c \
-file_process/file_sort.c \
-compression.c \
-file_process/file_tools.c \
-decompression.c \
-verification.c \
-hashmap.c \
--o main \
--lz -lssl -lcrypto -Wno-deprecated-declarations
+    -I/opt/homebrew/opt/openssl@3/include \
+    -L/opt/homebrew/opt/openssl@3/lib \
+    main.c \
+    file_process/file_sort.c \
+    compression.c \
+    file_process/file_tools.c \
+    decompression.c \
+    verification.c \
+    hashmap.c \
+    -o main \
+    -lz -lssl -lcrypto -Wno-deprecated-declarations
 ```
 
 **3. Run the Compression Program**
 ```
-mpirun -n 2 main compress source_dir output_dir
+```bash
+mpirun -n 2 main compress <source_directory> <output_directory>
 ```
 - Use `compress` to do compression.
 - `-n 2` specifies the number of processes. 
-- `source_dir`: Directory containing the files to be compressed.
-- `output_dir`: Directory where the compressed .zwz files will be saved.
+- `source_directory`: Directory containing the files to be compressed.
+- `output_directory`: Directory where the compressed .zwz files will be saved.
 
 **4. Run the Decompression Program**
 ```
-mpirun -n 1 main decompress source_dir output_dir
+mpirun -n 1 main decompress <source_directory> <output_directory>
 ```
 - Use `decompress` to do decompression.
-- `source_dir`: Directory containing the .zwz file 
-- `output_dir`: Directory where the decompressed files will be saved
+- `source_directory`: Directory containing the .zwz file 
+- `output_directory`: Directory where the decompressed files will be saved
 - Decompression only requires **1** MPI process and uses OpenMP to parallelize the decompression process.
 
 ### MacOS Troubleshooting
