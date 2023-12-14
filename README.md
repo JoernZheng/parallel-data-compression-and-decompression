@@ -117,19 +117,28 @@ mpicc -fopenmp file_process/file_sort.c main.c compression.c hashmap.c file_proc
 ```
 
 ## Implementation
-In this project, we primarily utilized C, MPI, and OpenMP, implementing three main functionalities: compression, decompression, and verification.
+
+In this project, we primarily utilized C, MPI (Message Passing Interface), OpenMP, and the DEFLATE algorithm for 
+compression and decompression. Our implementation focused on three core functionalities: **Compression**, **Decompression**, **Verification**.
 
 ### Compression
 
-STEP 1: Read all files in the source directory, sort them in descending order by size, and save the result to a local text file (sorted_file_by_size.txt).
+**Step 1**
 
-STEP 2: Use **MPI** to distribute files to different cores, with each core responsible for compressing a portion of the files.
+Read all files in the source directory, sort them in descending order by size, and save the result to a local text file (sorted_file_by_size.txt).
+
+**Step 2**
+
+Use **MPI** to distribute files to different cores, with each core responsible for compressing a portion of the files.
 This distribution strategy is similar to the PI calculation in the course, where files are assigned to different cores in sequence.
+
 For example, with two cores, the first core compresses the 1st, 3rd, 5th, 7th, 9th... files, while the second core compresses the 2nd, 4th, 6th, 8th, 10th... files.
 This strategy helps balance the compression load across different cores.
 ![Compression Process](pictures/csci596-compression.png)
 
-STEP 3: Implement parallelism using **OpenMP** by designing the compression process as a **producer-consumer model**. The producer runs in a single thread, responsible for reading files and placing file chunks into the processing queue. The consumer runs in multiple threads, taking file chunks from the queue for compression and writing them to the output stream.
+**Step 3**
+
+Implement parallelism using **OpenMP** by designing the compression process as a **producer-consumer model**. The producer runs in a single thread, responsible for reading files and placing file chunks into the processing queue. The consumer runs in multiple threads, taking file chunks from the queue for compression and writing them to the output stream.
 ![Producer-Consumer Model](pictures/csci596-producer-and-worker.png)
 
 ### Decompression
