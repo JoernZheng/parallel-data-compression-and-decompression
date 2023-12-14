@@ -1,50 +1,85 @@
 #include "process.h"
-#include <dirent.h>
+#include <errno.h>
 
 struct HashMap* filePathMap;
 
-int createDirectory(const char *path) {
-    struct stat st;
+// int createDirectory(const char *path) {
+//     struct stat st;
 
-    // Check if the directory already exists
-    if (stat(path, &st) == -1)
-    {
-        // Directory doesn't exist, so create it
-        if (mkdir(path, 0777) != 0)
-        {
-            perror("Error creating directory");
-            return 1; // Return an error code
-        }
-    }
+//     // Check if the directory already exists
+//     if (stat(path, &st) == -1)
+//     {
+//         // Directory doesn't exist, so create it
+//         if (mkdir(path, 0777) != 0)
+//         {
+//             perror("Error creating directory");
+//             return 1; // Return an error code
+//         }
+//     }
 
-    return 0; // Return success
+//     return 0; // Return success
+// }
+
+// int createDirectories(const char *path) {
+//     char *pathCopy = strdup(path);
+//     char *token = strtok(pathCopy, "/");
+//     char currentPath[1024];
+
+//     strcpy(currentPath, token);
+
+//     while (token != NULL)
+//     {
+//         if (createDirectory(currentPath) != 0)
+//         {
+//             free(pathCopy);
+//             return 1; // Return an error code
+//         }
+
+//         token = strtok(NULL, "/");
+//         if (token != NULL)
+//         {
+//             strcat(currentPath, "/");
+//             strcat(currentPath, token);
+//         }
+//     }
+
+//     free(pathCopy);
+//     return 0; // Return success
+// }
+
+
+// Function to create a directory if it doesn't exist
+int create_directory(const char *path) {
+    return mkdir(path, 0777); // Using 0777 permission
 }
 
-int createDirectories(const char *path) {
-    char *pathCopy = strdup(path);
-    char *token = strtok(pathCopy, "/");
-    char currentPath[1024];
+// Recursive function to create directories
+void createDirectories(const char *path) {
+    char temp[1024];
+    strncpy(temp, path, sizeof(temp));
+    temp[sizeof(temp) - 1] = '\0';
 
-    strcpy(currentPath, token);
+    for (char *p = temp + 1; *p; p++) {
+        if (*p == '/') {
+            // Temporarily end the string here
+            *p = '\0';
 
-    while (token != NULL)
-    {
-        if (createDirectory(currentPath) != 0)
-        {
-            free(pathCopy);
-            return 1; // Return an error code
-        }
+            // Create the directory and check for error
+            if (create_directory(temp) != 0 && errno != EEXIST) {
+                perror("create_directory failed");
+                exit(EXIT_FAILURE);
+            }
 
-        token = strtok(NULL, "/");
-        if (token != NULL)
-        {
-            strcat(currentPath, "/");
-            strcat(currentPath, token);
+            // Restore the slash for the next iteration
+            *p = '/';
         }
     }
 
-    free(pathCopy);
-    return 0; // Return success
+    // Create the last directory in the path
+    if (create_directory(temp) != 0 && errno != EEXIST) {
+        perror("create_directory failed");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
@@ -79,7 +114,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
 
         // Decompress data to output buffer
         do {
-            strm.avail_out = CHUNK_SIZE;
+            strm.avail_out = CHUNK_SIZE + 1000;
             strm.next_out = out;
             ret = inflate(&strm, Z_NO_FLUSH);
             if (ret != Z_OK && ret != Z_STREAM_END) {
@@ -87,7 +122,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
                 fprintf(stderr, "Zlib decompression error: %d\n", ret);
                 return;
             }
-            size_t have = CHUNK_SIZE - strm.avail_out;
+            size_t have = CHUNK_SIZE + 1000 - strm.avail_out;
             fwrite(out, 1, have, out_fp);
 
         } while (strm.avail_out == 0);
@@ -95,6 +130,216 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
 
     // Clean up zlib stream
     inflateEnd(&strm);
+}
+
+// void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
+//     // 初始化 zlib 解压缩流
+//     z_stream strm;
+//     strm.zalloc = Z_NULL;
+//     strm.zfree = Z_NULL;
+//     strm.opaque = Z_NULL;
+//     if (inflateInit(&strm) != Z_OK) {
+//         fprintf(stderr, "Failed to initialize zlib stream\n");
+//         return;
+//     }
+
+//     // 分配输入和输出缓冲区
+//     unsigned char in[CHUNK_SIZE];
+//     unsigned char out[CHUNK_SIZE];
+//     size_t remaining = header.size; // 压缩数据的剩余量
+
+//     // 读取和解压缩数据
+//     int ret;
+//     do {
+//         size_t to_read = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
+//         strm.avail_in = fread(in, 1, to_read, fp);
+//         if (strm.avail_in == 0) {
+//             break;
+//         }
+//         strm.next_in = in;
+//         remaining -= strm.avail_in;
+
+//         // 解压缩数据到输出缓冲区
+//         do {
+//             strm.avail_out = CHUNK_SIZE;
+//             strm.next_out = out;
+//             ret = inflate(&strm, Z_NO_FLUSH);
+//             if (ret != Z_OK && ret != Z_STREAM_END) {
+//                 inflateEnd(&strm);
+//                 fprintf(stderr, "Zlib decompression error: %d\n", ret);
+//                 return;
+//             }
+//             size_t have = CHUNK_SIZE - strm.avail_out;
+//             fwrite(out, 1, have, out_fp);
+//         } while (strm.avail_out == 0);
+//     } while (ret != Z_STREAM_END && remaining > 0);
+
+//     // 清理 zlib 流
+//     inflateEnd(&strm);
+// }
+
+// void decompress_sorted_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
+//     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
+
+//     // Initialize zlib decompression stream
+//     z_stream strm;
+//     strm.zalloc = Z_NULL;
+//     strm.zfree = Z_NULL;
+//     strm.opaque = Z_NULL;
+//     if (inflateInit(&strm) != Z_OK) {
+//         fprintf(stderr, "Failed to initialize zlib stream\n");
+//         return;
+//     }
+
+//     // Allocate input and output buffers
+//     printf("This is test");
+//     unsigned char in[header.size + 100];
+//     unsigned char out[header.size + 100];
+
+//     long remaining = header.size; // Remaining amount of compressed data
+
+//     // Read and decompress data
+//     int ret;
+//     do {
+//         // long to_read = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
+//         strm.avail_in = fread(in, sizeof(unsigned char), header.size, fp);
+//         if (strm.avail_in == 0) {
+//             break;
+//         }
+//         strm.next_in = in;
+//         remaining -= strm.avail_in;
+
+//         // Decompress data to output buffer
+//         do {
+//             strm.avail_out = header.size;
+//             strm.next_out = out;
+//             ret = inflate(&strm, Z_NO_FLUSH);
+//             if (ret != Z_OK && ret != Z_STREAM_END) {
+//                 inflateEnd(&strm);
+//                 fprintf(stderr, "Zlib decompression error: %d\n", ret);
+//                 return;
+//             }
+//             size_t have = header.size;
+//             fwrite(out, 1, have, out_fp);
+
+//         } while (strm.avail_out == 0);
+//     } while (ret != Z_STREAM_END && remaining > 0);
+
+//     // Clean up zlib stream
+//     inflateEnd(&strm);
+// }
+
+// 分块处理数据进行解压
+// void decompress_sorted_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
+//     // Initialize zlib decompression stream
+//     z_stream strm;
+//     strm.zalloc = Z_NULL;
+//     strm.zfree = Z_NULL;
+//     strm.opaque = Z_NULL;
+//     if (inflateInit(&strm) != Z_OK) {
+//         fprintf(stderr, "Failed to initialize zlib stream\n");
+//         return;
+//     }
+
+//     // Allocate input and output buffers for chunk size
+//     unsigned char in[CHUNK_SIZE];
+//     unsigned char out[CHUNK_SIZE];
+
+//     long remaining = header.size; // Remaining amount of compressed data
+
+//     // Read and decompress data in chunks
+//     int ret;
+//     do {
+//         long to_read = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
+//         strm.avail_in = fread(in, 1, to_read, fp);
+//         if (strm.avail_in == 0) {
+//             break;
+//         }
+//         strm.next_in = in;
+//         remaining -= strm.avail_in;
+
+//         // Decompress data to output buffer
+//         do {
+//             strm.avail_out = CHUNK_SIZE;
+//             strm.next_out = out;
+//             ret = inflate(&strm, Z_NO_FLUSH);
+//             if (ret != Z_OK && ret != Z_STREAM_END) {
+//                 fprintf(stderr, "Zlib decompression error: %d\n", ret);
+//                 inflateEnd(&strm);
+//                 return;
+//             }
+//             size_t have = CHUNK_SIZE - strm.avail_out;
+//             fwrite(out, 1, have, out_fp);
+//         } while (strm.avail_out == 0);
+//     } while (ret != Z_STREAM_END && remaining > 0);
+
+//     // Clean up zlib stream
+//     inflateEnd(&strm);
+// }
+
+// 动态内存分配：
+// 解压缩函数
+void decompress_sorted_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
+    // 初始化 zlib 解压流
+    z_stream strm;
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    if (inflateInit(&strm) != Z_OK) {
+        fprintf(stderr, "Failed to initialize zlib stream\n");
+        return;
+    }
+
+    // 动态分配输入和输出缓冲区
+    unsigned char *in = (unsigned char *)malloc(header.size + 100);
+    if (in == NULL) {
+        fprintf(stderr, "Failed to allocate memory for input buffer\n");
+        inflateEnd(&strm);
+        return;
+    }
+
+    unsigned char *out = (unsigned char *)malloc(header.size + 100);
+    if (out == NULL) {
+        fprintf(stderr, "Failed to allocate memory for output buffer\n");
+        free(in);
+        inflateEnd(&strm);
+        return;
+    }
+
+    long remaining = header.size; // 剩余压缩数据量
+
+    // 读取和解压数据
+    int ret;
+    do {
+        strm.avail_in = fread(in, sizeof(unsigned char), header.size, fp);
+        if (strm.avail_in == 0) {
+            break;
+        }
+        strm.next_in = in;
+        remaining -= strm.avail_in;
+
+        // 解压数据到输出缓冲区
+        do {
+            strm.avail_out = header.size;
+            strm.next_out = out;
+            ret = inflate(&strm, Z_NO_FLUSH);
+            if (ret != Z_OK && ret != Z_STREAM_END) {
+                inflateEnd(&strm);
+                fprintf(stderr, "Zlib decompression error: %d\n", ret);
+                free(in);
+                free(out);
+                return;
+            }
+            size_t have = header.size - strm.avail_out;
+            fwrite(out, 1, have, out_fp);
+
+        } while (strm.avail_out == 0);
+    } while (ret != Z_STREAM_END && remaining > 0);
+
+    // 清理 zlib 流和释放内存
+    inflateEnd(&strm);
+    free(in);
+    free(out);
 }
 
 struct HashMap* generateFileNamePathMap(char* output_file_path) {
@@ -177,7 +422,10 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     }
 
     // The header.is_last of the first file must be 1
-    decompress_file(fp, out_fp, header);
+    printf("HEre, %d\n", header.size);
+    decompress_sorted_file(fp, out_fp, header);
+    // sleep(5);
+    // decompress_file(fp, out_fp, header);
     fclose(out_fp);
     out_fp = NULL;
     // compare the hash value after decompression to verify the correctness of decompression
@@ -205,11 +453,12 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
             }
 
             // create non-existing directories
-            if (createDirectories(fullPath) != 0) {
-                printf("Failed to create directories: %s\n", fullPath);
-                fclose(fp);
-                return;
-            }
+            createDirectories(fullPath);
+            // if (createDirectories(fullPath) != 0) {
+            //     printf("Failed to create directories: %s\n", fullPath);
+            //     fclose(fp);
+            //     return;
+            // }
 
             // get the target file
             snprintf(output_file_path, sizeof(output_file_path), "%s/%s", fullPath, header.filename);
@@ -224,7 +473,7 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         decompress_file(fp, out_fp, header);
         if (header.is_last == 1) {
             if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
-                printf("Decompressing file: %s, is_last: %d, size: %d\n", header.filename, header.is_last, header.size);
+                // printf("Decompressing file: %s, is_last: %d, size: %d\n", header.filename, header.is_last, header.size);
                 // printf("Hash: %s\n", header.hash_value);
             }
             fclose(out_fp);
