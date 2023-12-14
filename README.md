@@ -181,5 +181,5 @@ After decompression, calculate the verification information from the decompresse
 ## Contributions
 - Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking, Readme Doc.
 - Yuhui Wu: File decompression.
-- Mianzhi Zhu: File verification, Readme Doc.
+- Mianzhi Zhu: File verification and integration, Readme Doc.
 
