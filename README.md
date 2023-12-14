@@ -72,6 +72,12 @@ mpirun -n 1 main decompress <source_directory> <output_directory>
 - `output_directory`: Directory where the decompressed files will be saved
 - Decompression only requires **1** MPI process and uses OpenMP to parallelize the decompression process.
 
+**5. Execution Examples**
+```
+mpirun -n 2 main compress /tmp/Cache/temp/data /tmp/Cache/temp/output
+mpirun -n 1 main decompress /tmp/Cache/temp/output /tmp/Cache/temp/output2
+```
+
 ### MacOS Troubleshooting
 **MacOS Compatibility with GCC and OpenMP**
 
@@ -90,11 +96,6 @@ export OMPI_CC=clang
 ### IDE Function Suggestions/Resolving Header File Not Found Issues
 Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not committed to your git repository.
 
-### Execution - Example
-```
-mpirun -n 2 main compress /tmp/Cache/temp/data /tmp/Cache/temp/output
-mpirun -n 1 main decompress /tmp/Cache/temp/output /tmp/Cache/temp/output2
-```
 
 
 ## Implementation
