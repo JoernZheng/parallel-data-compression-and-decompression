@@ -201,6 +201,8 @@ our solution outperforms these in single-core scenarios. This superior performan
 ![Compression Benchmark](pictures/csci596-perf-compression.png)
 ### Decompression
 
+![Compression Benchmark](pictures/csci596-perf_decompression.png)
+
 ## Contributions
 - Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking, Readme Doc.
 - Yuhui Wu: File decompression, Readme Doc.
