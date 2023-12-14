@@ -1,50 +1,85 @@
 #include "process.h"
-#include <dirent.h>
+#include <errno.h>
 
 struct HashMap* filePathMap;
 
-int createDirectory(const char *path) {
-    struct stat st;
+// int createDirectory(const char *path) {
+//     struct stat st;
 
-    // Check if the directory already exists
-    if (stat(path, &st) == -1)
-    {
-        // Directory doesn't exist, so create it
-        if (mkdir(path, 0777) != 0)
-        {
-            perror("Error creating directory");
-            return 1; // Return an error code
-        }
-    }
+//     // Check if the directory already exists
+//     if (stat(path, &st) == -1)
+//     {
+//         // Directory doesn't exist, so create it
+//         if (mkdir(path, 0777) != 0)
+//         {
+//             perror("Error creating directory");
+//             return 1; // Return an error code
+//         }
+//     }
 
-    return 0; // Return success
+//     return 0; // Return success
+// }
+
+// int createDirectories(const char *path) {
+//     char *pathCopy = strdup(path);
+//     char *token = strtok(pathCopy, "/");
+//     char currentPath[1024];
+
+//     strcpy(currentPath, token);
+
+//     while (token != NULL)
+//     {
+//         if (createDirectory(currentPath) != 0)
+//         {
+//             free(pathCopy);
+//             return 1; // Return an error code
+//         }
+
+//         token = strtok(NULL, "/");
+//         if (token != NULL)
+//         {
+//             strcat(currentPath, "/");
+//             strcat(currentPath, token);
+//         }
+//     }
+
+//     free(pathCopy);
+//     return 0; // Return success
+// }
+
+
+// Function to create a directory if it doesn't exist
+int create_directory(const char *path) {
+    return mkdir(path, 0777); // Using 0777 permission
 }
 
-int createDirectories(const char *path) {
-    char *pathCopy = strdup(path);
-    char *token = strtok(pathCopy, "/");
-    char currentPath[1024];
+// Recursive function to create directories
+void createDirectories(const char *path) {
+    char temp[1024];
+    strncpy(temp, path, sizeof(temp));
+    temp[sizeof(temp) - 1] = '\0';
 
-    strcpy(currentPath, token);
+    for (char *p = temp + 1; *p; p++) {
+        if (*p == '/') {
+            // Temporarily end the string here
+            *p = '\0';
 
-    while (token != NULL)
-    {
-        if (createDirectory(currentPath) != 0)
-        {
-            free(pathCopy);
-            return 1; // Return an error code
-        }
+            // Create the directory and check for error
+            if (create_directory(temp) != 0 && errno != EEXIST) {
+                perror("create_directory failed");
+                exit(EXIT_FAILURE);
+            }
 
-        token = strtok(NULL, "/");
-        if (token != NULL)
-        {
-            strcat(currentPath, "/");
-            strcat(currentPath, token);
+            // Restore the slash for the next iteration
+            *p = '/';
         }
     }
 
-    free(pathCopy);
-    return 0; // Return success
+    // Create the last directory in the path
+    if (create_directory(temp) != 0 && errno != EEXIST) {
+        perror("create_directory failed");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
@@ -205,11 +240,12 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
             }
 
             // create non-existing directories
-            if (createDirectories(fullPath) != 0) {
-                printf("Failed to create directories: %s\n", fullPath);
-                fclose(fp);
-                return;
-            }
+            createDirectories(fullPath);
+            // if (createDirectories(fullPath) != 0) {
+            //     printf("Failed to create directories: %s\n", fullPath);
+            //     fclose(fp);
+            //     return;
+            // }
 
             // get the target file
             snprintf(output_file_path, sizeof(output_file_path), "%s/%s", fullPath, header.filename);
