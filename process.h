@@ -43,6 +43,7 @@ typedef struct {
     size_t size;
     int is_last_chunk;
     int is_last_file;
+    char full_path[1024];
 } Chunk;
 
 typedef struct {
@@ -87,6 +88,5 @@ void insert(struct HashMap *map, char *key, char *value);
 char *search(struct HashMap *map, char *key);
 void resizeHashMap(struct HashMap *map);
 void destroyHashMap(struct HashMap *map);
-void moveToBadDir(const char *filename, const char *file_path, const char *output_dir_path);
 
 #endif

@@ -47,12 +47,9 @@ int createDirectories(const char *path) {
     return 0; // Return success
 }
 
-int decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
+void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
-    if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
-        printf("Hash of this chunk from <%s> is: %s\n", header.filename, header.hash_value);
-    }
-    int hashMatch = 0;
+
 
     // Initialize zlib decompression stream
     z_stream strm;
@@ -65,8 +62,8 @@ int decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     }
 
     // Allocate input and output buffers
-    unsigned char in[CHUNK_SIZE];
-    unsigned char out[CHUNK_SIZE];
+    unsigned char in[CHUNK_SIZE + 1000];
+    unsigned char out[CHUNK_SIZE + 1000];
 
     long remaining = header.size; // Remaining amount of compressed data
 
@@ -94,27 +91,11 @@ int decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
             size_t have = CHUNK_SIZE - strm.avail_out;
             fwrite(out, 1, have, out_fp);
 
-            Chunk decompressedChunk;
-            // decompressedChunk.data = out;
-            strncpy(decompressedChunk.data, out, have);
-            decompressedChunk.data[have] = '\0';
-            decompressedChunk.size = have + 1;
-
-            // decompressedChunk.size = have;
-            
-            char* decompressedChunkHash = get_chunk_hash(&decompressedChunk);
-            if (strcmp(decompressedChunkHash, header.hash_value) != 0) {
-                printf("decompressedChunkHash: %s\n", decompressedChunkHash);
-                printf("header.hash_value: %s\n", header.hash_value);
-                hashMatch = -1;
-            }
-
         } while (strm.avail_out == 0);
     } while (ret != Z_STREAM_END && remaining > 0);
 
     // Clean up zlib stream
     inflateEnd(&strm);
-    return hashMatch;
 }
 
 struct HashMap* generateFileNamePathMap(char* output_file_path) {
@@ -197,7 +178,6 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     }
 
     // The header.is_last of the first file must be 1
-    int hashMatch = 0;
     decompress_file(fp, out_fp, header);
     fclose(out_fp);
     out_fp = NULL;
@@ -206,13 +186,6 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     char* bad_dir_name;
     size_t bad_dir_len;
     char *bad_dir;
-
-    // char* bad_dir_name = "bad";
-    // size_t bad_dir_len = strlen(fullPath) + 1 + strlen(bad_dir_name) + 1;
-    // char *bad_dir = (char*)malloc(bad_dir_len);
-    // snprintf(bad_dir, strlen(bad_dir), "%s/%s", output_dir_path, bad_dir_name);
-    
-    // verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
 
     // Read sort size file
     filePathMap = generateFileNamePathMap(output_file_path);
@@ -249,29 +222,21 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
             }
         }
 
-        int currHashMatch = decompress_file(fp, out_fp, header);
-        if (currHashMatch != 0) hashMatch = -1;
+        decompress_file(fp, out_fp, header);
         if (header.is_last == 1) {
+            if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
+                printf("Hash of this chunk from <%s> is: %s\n", header.filename, header.hash_value);
+            }
             fclose(out_fp);
             out_fp = NULL;
             
             // compare the hash value after decompression to verify the correctness of decompression
-            if (hashMatch != 0) {
-                hash = get_hash(output_file_path);
-                bad_dir_name = "bad";
-                size_t bad_dir_len = strlen(fullPath) + 1 + strlen(bad_dir_name) + 1;
-                bad_dir = (char*)malloc(bad_dir_len);
-                snprintf(bad_dir, bad_dir_len, "%s/%s", fullPath, bad_dir_name);
-                
-                // verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
-                moveToBadDir(header.filename, output_file_path, bad_dir);
-
-                printf("header.hash_value: %s\n", header.hash_value);
-                printf("hash: %s\n", hash);
-            }
-            
-
-            hashMatch = 0;
+            hash = get_hash(output_file_path);
+            bad_dir_name = "bad";
+            size_t bad_dir_len = strlen(fullPath) + 1 + strlen(bad_dir_name) + 1;
+            bad_dir = (char*)malloc(bad_dir_len);
+            snprintf(bad_dir, bad_dir_len, "%s/%s", fullPath, bad_dir_name);
+            verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
         }
     }
     free(bad_dir);
