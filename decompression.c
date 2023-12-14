@@ -50,7 +50,6 @@ int createDirectories(const char *path) {
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
 
-
     // Initialize zlib decompression stream
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -225,7 +224,8 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         decompress_file(fp, out_fp, header);
         if (header.is_last == 1) {
             if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
-                printf("Hash of this chunk from <%s> is: %s\n", header.filename, header.hash_value);
+                printf("Decompressing file: %s, is_last: %d, size: %d\n", header.filename, header.is_last, header.size);
+                // printf("Hash: %s\n", header.hash_value);
             }
             fclose(out_fp);
             out_fp = NULL;
