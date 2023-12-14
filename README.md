@@ -93,19 +93,16 @@ export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
 export OMPI_CC=clang
 ```
 
-### IDE Function Suggestions/Resolving Header File Not Found Issues
-Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not committed to your git repository.
-
 ### Linux/Ubuntu/Debian
 **0. Prerequisites**
 
 Install sudo on your Linux/Ubuntu/Debian
-```shell
+```
 apt install sudo
 ```
 **1. Install Necessary Dependencies**
 
-```shell
+```
 sudo apt install mpich
 sudo apt install zlib1g-dev
 sudo apt install openssl -y or sudo apt-get install libssl-dev
@@ -116,12 +113,28 @@ sudo apt install openssl -y or sudo apt-get install libssl-dev
 mpicc -fopenmp file_process/file_sort.c main.c compression.c hashmap.c file_process/file_tools.c decompression.c verification.c -o main -lz -lcrypto
 ```
 
+**3. Run the Compression Program**
+
+Same as macOS part.
+
+
+**4. Run the Decompression Program**
+
+Same as macOS part.
+
+### IDE Function Suggestions/Resolving Header File Not Found Issues
+Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not committed to your git repository.
+
 ## Implementation
 
 In this project, we primarily utilized C, MPI (Message Passing Interface), OpenMP, and the DEFLATE algorithm for 
 compression and decompression. Our implementation focused on three core functionalities: **Compression**, **Decompression**, **Verification**.
 
 ### Compression
+There are two common methods of parallel compression. Each method has its unique advantages, with the choice depending on the specific requirements of the compression task:
+
+- **Pack-then-Compress**: As exemplified by the pigz program, this method involves packaging files together before compression. Its advantage is higher compression efficiency.
+- **Shard-Based Compression**: **This is the approach used in our program.** It involves dividing a file or file blocks into different compression shards, each compressed separately. This method offers faster compression speeds but may have lower efficiency compared to pack-then-compress.
 
 **Step 1**
 
@@ -176,7 +189,16 @@ After decompression, calculate the verification information from the decompresse
 
 ## Benchmark
 ### Compression
-![Compression Benchmark](pictures/csci596-performance_compression.png)
+Our analysis reveals that **as the number of cores increases, compression efficiency improves**, aligning with our initial performance expectations. 
+However, **the rate of efficiency gain diminishes with more cores**. 
+
+Additionally, when compared to macOS's built-in zip and tar+gzip methods, 
+our solution outperforms these in single-core scenarios. This superior performance can be attributed to:
+
+1. More efficient compression algorithms compared to zip.
+2. Unlike tar+gzip, which also uses the DEFLATE algorithm, our method doesn't require pre-packing files with the tar command, thereby enhancing overall compression efficiency.
+
+![Compression Benchmark](pictures/csci596-perf-compression.png)
 ### Decompression
 
 ## Contributions
