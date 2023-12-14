@@ -144,9 +144,10 @@ Implement parallelism using **OpenMP** by designing the compression process as a
 ![Producer-Consumer Model](pictures/csci596-producer-and-worker.png)
 
 ### Decompression
+
 **Step 1**
 
-Use OpenMP's multithreading to parallelize the assignment of different .zwz files to different decompression threads.
+Use OpenMP's multithreading to parallel assign different file segments to various decompression threads.
 
 **Step 2**
 
@@ -180,6 +181,6 @@ After decompression, calculate the verification information from the decompresse
 
 ## Contributions
 - Yaowen Zheng: Software workflow design, starter code, file compression, benchmarking, Readme Doc.
-- Yuhui Wu: File decompression.
+- Yuhui Wu: File decompression, Readme Doc.
 - Mianzhi Zhu: File verification and integration, Readme Doc.
 
