@@ -358,42 +358,19 @@ void do_compression(const char *input_dir, const char *output_dir, const char *f
     printf("Initialized semaphores in %d process\n", world_rank);
     printf("Max record line num: %d\n", max_record_line_num);
 
-//    #pragma omp parallel
-//    {
-//        #pragma omp master
-//        {
-//            // printf("Producer %d\n", world_rank);
-//            producer(input_dir, file_record, world_rank);
-//            // printf("Producer %d finished\n", world_rank);
-//        }
-//
-//        #pragma omp barrier
-//
-//        #pragma omp for
-//        for (int i = 0; i < NUM_CONSUMERS; ++i) {
-//            // printf("Consumer %d\n", world_rank);
-//            consumer();
-//            // printf("Consumer %d finished\n", i);
-//        }
-//    }
-
     #pragma omp parallel sections
     {
         #pragma omp critical
         {
-//            printf("Producer %d\n", world_rank);
             producer(input_dir, file_record, world_rank);
-//            printf("Producer %d finished\n", world_rank);
         }
 
         #pragma omp section
         {
-//            printf("Consumer %d\n", world_rank);
             for (int i = 0; i < NUM_CONSUMERS; ++i) {
                 #pragma omp task
                 {
                     consumer();
-//                    printf("Consumer %d finished\n", i);
                 }
             }
         }
