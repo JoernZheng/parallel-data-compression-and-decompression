@@ -7,7 +7,17 @@
 - Mianzhi Zhu - USC Computer Science
 
 ## Introduction
-This project focuses on the compression and decompression of large datasets and enables parallel computing across multiple nodes of a single disk system using MPI and OpenMP.
+In the rapidly evolving fields of computer and data science, an increasing number of ultra-large datasets are emerging. 
+Traditional compression and decompression tools like zip and gzip, due to their single-threaded nature, often prove 
+time-consuming for these datasets. For instance, compressing a dataset of approximately 370,000 images, totaling around 
+2.5GB, takes over two minutes on an M1 MacBook when using system-provided zip software. This timeframe becomes impractical for 
+larger datasets, which are becoming more common. Thus, leveraging parallel computing technology to expedite the compression and decompression 
+process is essential. So, we chose "Parallel Directory Compression and Decompression" as our CSCI596 final project, which addresses this need.
+
+This project focuses on **parallelizing** the compression and decompression processes for **large datasets**. 
+We use **C** language combined with computing libraries like **Open MPI** (Message Passing Interface) and **OpenMP** to 
+implement parallel compression and decompression based on sharding technology. For more details on the implementation 
+architecture, please refer to the [Implementation](#implementation) section.
 
 ## Run Instructions
 
