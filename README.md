@@ -93,6 +93,9 @@ export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
 export OMPI_CC=clang
 ```
 
+### IDE Function Suggestions/Resolving Header File Not Found Issues
+Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not committed to your git repository.
+
 ### Linux/Ubuntu/Debian
 **0. Prerequisites**
 
@@ -112,11 +115,6 @@ sudo apt install openssl -y or sudo apt-get install libssl-dev
 ```
 mpicc -fopenmp file_process/file_sort.c main.c compression.c hashmap.c file_process/file_tools.c decompression.c verification.c -o main -lz -lcrypto
 ```
-
-### IDE Function Suggestions/Resolving Header File Not Found Issues
-Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not committed to your git repository.
-
-
 
 ## Implementation
 In this project, we primarily utilized C, MPI, and OpenMP, implementing three main functionalities: compression, decompression, and verification.
