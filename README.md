@@ -22,20 +22,74 @@ architecture, please refer to the [Implementation](#implementation) section.
 ## Run Instructions
 
 ### Dependencies
-- MPI
-- OpenMP
-- zlib
-- OpenSSL/MD5
+- `MPI`
+- `OpenMP`
+- `zlib`
+- `OpenSSL/MD5`
 
-For MacOS, these can be installed using Homebrew. On Linux, they are available through package managers like apt-get.
+### MacOS - Arm
+**0. Prerequisites**
+
+Ensure Homebrew is installed on your system. If not, please follow the instructions on the [Homebrew](https://brew.sh/) website.
+
+**1. Install Necessary Dependencies**
+
+```shell
+brew install gcc openmp libomp openssl@3
+```
+
+**2. Compile the Program**
+```
+mpicc -fopenmp \
+-I/opt/homebrew/opt/openssl@3/include \
+-L/opt/homebrew/opt/openssl@3/lib \
+main.c \
+file_process/file_sort.c \
+compression.c \
+file_process/file_tools.c \
+decompression.c \
+verification.c \
+hashmap.c \
+-o main \
+-lz -lssl -lcrypto -Wno-deprecated-declarations
+```
+
+**3. Run the Compression Program**
+```
+mpirun -n 2 main compress source_dir output_dir
+```
+- Use `compress` to do compression.
+- `-n 2` specifies the number of processes. 
+- `source_dir`: Directory containing the files to be compressed.
+- `output_dir`: Directory where the compressed .zwz files will be saved.
+
+**4. Run the Decompression Program**
+```
+mpirun -n 1 main decompress source_dir output_dir
+```
+- Use `decompress` to do decompression.
+- `source_dir`: Directory containing the .zwz file 
+- `output_dir`: Directory where the decompressed files will be saved
+- Decompression only requires **1** MPI process and uses OpenMP to parallelize the decompression process.
+
+### MacOS Troubleshooting
+**MacOS Compatibility with GCC and OpenMP**
+
+If you encounter compatibility issues when compiling the program or any other OpenMP program, please install LLVM's Clang and configure the path:
+
+**Install LLVM:**
+```
+brew install llvm
+```
+**Configure zsh/bash**
+```
+export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+export OMPI_CC=clang
+```
 
 ### IDE Function Suggestions/Resolving Header File Not Found Issues
 Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not committed to your git repository.
 
-### Compilation - Example
-```
-mpicc -fopenmp file_process/file_sort.c main.c compression.c file_process/file_tools.c decompression.c hashmap.c verification.c -o main -lz -lssl -lcrypto
-```
 ### Execution - Example
 ```
 mpirun -n 2 main compress /tmp/Cache/temp/data /tmp/Cache/temp/output
