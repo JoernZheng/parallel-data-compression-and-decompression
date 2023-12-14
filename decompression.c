@@ -1,6 +1,7 @@
 #include "process.h"
 #include <dirent.h>
 
+struct HashMap* filePathMap;
 
 int createDirectory(const char *path) {
     struct stat st;
@@ -48,9 +49,6 @@ int createDirectories(const char *path) {
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
     // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
-    if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
-        printf("Hash of this chunk from <%s> is: %s\n", header.filename, header.hash_value);
-    }
 
     // Initialize zlib decompression stream
     z_stream strm;
@@ -91,6 +89,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
             }
             size_t have = CHUNK_SIZE - strm.avail_out;
             fwrite(out, 1, have, out_fp);
+
         } while (strm.avail_out == 0);
     } while (ret != Z_STREAM_END && remaining > 0);
 
@@ -101,7 +100,7 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
 struct HashMap* generateFileNamePathMap(char* output_file_path) {
     FILE* sortSizeFile = fopen(output_file_path, "r");
     if (sortSizeFile == NULL) {
-        fprintf(stderr, "Error opening file.\n");
+        fprintf(stderr, "Error opening sorted txt file.\n");
         return NULL;
     }
 
@@ -181,14 +180,25 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
     decompress_file(fp, out_fp, header);
     fclose(out_fp);
     out_fp = NULL;
+    // compare the hash value after decompression to verify the correctness of decompression
+    char *hash = get_hash(output_file_path);
+    char* bad_dir_name;
+    size_t bad_dir_len;
+    char *bad_dir;
 
     // Read sort size file
-    struct HashMap* filePathMap = generateFileNamePathMap(output_file_path);
+    filePathMap = generateFileNamePathMap(output_file_path);
+    if (filePathMap == NULL) {
+        printf("filePathMap is NULL\n");
+        exit(-1);
+    }
 
+    char* fullPath;
     // Read subsequent headers
     while (fread(&header, sizeof(ChunkHeader), 1, fp) == 1) {
+        
         if (out_fp == NULL) {
-            char* fullPath = generateFullPath(output_dir_path, filePathMap, header);
+            fullPath = generateFullPath(output_dir_path, filePathMap, header);
             if (fullPath == NULL){
                 fclose(fp);
                 return;
@@ -213,15 +223,23 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
 
         decompress_file(fp, out_fp, header);
         if (header.is_last == 1) {
+            if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
+                printf("Decompressing file: %s, is_last: %d, size: %d\n", header.filename, header.is_last, header.size);
+                // printf("Hash: %s\n", header.hash_value);
+            }
             fclose(out_fp);
             out_fp = NULL;
+            
             // compare the hash value after decompression to verify the correctness of decompression
-            char *hash = get_hash(output_file_path);
-            char *bad_dir = "../bad";
-            // verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
-            // printf("Hash of %s: %s and it's original hash value: %s\n", output_file_path, hash, header.hash_value);
+            hash = get_hash(output_file_path);
+            bad_dir_name = "bad";
+            size_t bad_dir_len = strlen(fullPath) + 1 + strlen(bad_dir_name) + 1;
+            bad_dir = (char*)malloc(bad_dir_len);
+            snprintf(bad_dir, bad_dir_len, "%s/%s", fullPath, bad_dir_name);
+            verify(header.hash_value, hash, header.filename, output_file_path, bad_dir);
         }
     }
+    free(bad_dir);
     destroyHashMap(filePathMap);
 }
 
@@ -230,7 +248,6 @@ void do_decompression(const char *source_dir_path, const char *output_dir_path) 
     DIR *dir;
     struct dirent *ent;
     int readEnd = 0;
-    // char* d_name_copy;
 
     dir = opendir(source_dir_path);
     if (dir == NULL) perror("Could not open source directory");
@@ -276,6 +293,3 @@ void do_decompression(const char *source_dir_path, const char *output_dir_path) 
         closedir(dir);
     }
 }
-
-
-

@@ -116,11 +116,13 @@ STEP 3: Implement parallelism using **OpenMP** by designing the compression proc
 
 ### Decompression
 
-STEP 1: Use OpenMP's multithreading to parallel assign different file segments to various decompression threads.
+STEP 1: Use OpenMP's multithreading to parallelize the assignment of different .zwz files to different decompression threads.
 
-STEP 2: Process involves reading a fixed-length header from the stream, extracting the corresponding file chunk based on the header information.
+STEP 2: Read the first file, sorted_files_by_size.txt, and then generate a hash map with file name - file path pairs.
 
-STEP 3: Decompress the file chunk and write the decompressed content to the output stream.
+STEP 3: Read subsequent file chunks. The process involves reading a fixed-length header from the stream, extracting the corresponding file chunk based on the header information, decompressing each one, and then verifying the hash value.
+
+STEP 4: If the hash value is the same as in the compressed file, write the file to the correct location. Otherwise, write the file to the "[relative path]/bad" directory.
 ![Decompression Process](pictures/csci596-decompression.png)
 
 ### Verification
