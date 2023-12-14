@@ -98,11 +98,20 @@ export OMPI_CC=clang
 
 Install sudo on your Linux/Ubuntu/Debian
 ```shell
-apt update && apt upgrade
 apt install sudo
-adduser <your_name>
+```
+**1. Install Necessary Dependencies**
+
+```shell
+sudo apt install mpich
+sudo apt install zlib1g-dev
+sudo apt install openssl -y or sudo apt-get install libssl-dev
 ```
 
+**2. Compile the Program**
+```
+mpicc -fopenmp file_process/file_sort.c main.c compression.c hashmap.c file_process/file_tools.c decompression.c verification.c -o main -lz -lcrypto
+```
 
 ### IDE Function Suggestions/Resolving Header File Not Found Issues
 Modify your dependency paths in `CMakeLists.txt`. Please ensure this file is not committed to your git repository.
