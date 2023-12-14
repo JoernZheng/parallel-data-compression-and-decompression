@@ -43,6 +43,7 @@ typedef struct {
     size_t size;
     int is_last_chunk;
     int is_last_file;
+    char full_path[1024];
 } Chunk;
 
 typedef struct {

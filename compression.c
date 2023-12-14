@@ -69,10 +69,14 @@ void data_writer(Chunk *chunk, long compressed_size, const unsigned char *compre
     header.is_last = chunk->is_last_chunk;
     
     // Calculate the hash value of each chunk and write it into the ChunkHeader
-    char *chunk_hash = get_chunk_hash(chunk);
-    strncpy(header.hash_value, chunk_hash, sizeof(header.hash_value) - 1);
-    header.hash_value[sizeof(header.hash_value) - 1] = '\0';
-    // printf("Hash of this chunk from %s is: %s\n", full_path, chunk_hash);
+    // char *chunk_hash = get_chunk_hash(chunk);
+    if (chunk->is_last_chunk == 1) {
+        char *chunk_hash = get_hash(chunk->full_path);
+        strncpy(header.hash_value, chunk_hash, sizeof(header.hash_value) - 1);
+        header.hash_value[sizeof(header.hash_value) - 1] = '\0';
+    }
+    
+    // printf("Hash of this chunk from %s is: %s\n", chunk->full_path, chunk_hash);
 
     fwrite(&header, sizeof(header), 1, dest);
     fwrite(compressed_data, sizeof(unsigned char), compressed_size, dest);
@@ -140,8 +144,8 @@ void producer(const char *input_dir, const char *file_record, int world_rank) {
                 } else {
                     chunk.is_last_file = 0;
                 }
-//                strncpy(chunk.full_path, full_path, sizeof(chunk.full_path) - 1);
-//                chunk.full_path[sizeof(chunk.full_path) - 1] = '\0';
+               strncpy(chunk.full_path, full_path, sizeof(chunk.full_path) - 1);
+               chunk.full_path[sizeof(chunk.full_path) - 1] = '\0';
                 sem_wait(sem_queue_not_full);
                 omp_set_lock(&queue_lock);
                 queue[queue_tail] = chunk;
@@ -194,7 +198,7 @@ void consumer() {
         strm.avail_in = chunk.size;
         strm.next_in = chunk.data;
         unsigned char out[CHUNK_SIZE];
-        strm.avail_out = CHUNK_SIZE];
+        strm.avail_out = CHUNK_SIZE;
         strm.next_out = out;
 
         // deflate(&strm, chunk.is_last_chunk ? Z_FINISH : Z_NO_FLUSH);
