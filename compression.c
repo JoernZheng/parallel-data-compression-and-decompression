@@ -194,7 +194,7 @@ void consumer() {
         strm.avail_in = chunk.size;
         strm.next_in = chunk.data;
         unsigned char out[CHUNK_SIZE];
-        strm.avail_out = CHUNK_SIZE];
+        strm.avail_out = CHUNK_SIZE;
         strm.next_out = out;
 
         // deflate(&strm, chunk.is_last_chunk ? Z_FINISH : Z_NO_FLUSH);

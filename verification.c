@@ -70,3 +70,20 @@ void verify(const char *hash_header, const char *hash_decmprs, const char *filen
         }
     }
 }
+
+void moveToBadDir(const char *filename, const char *file_path, const char *output_dir_path) {
+    DIR *dir;
+    char dest[1024];
+    sprintf(dest, "%s/%s", output_dir_path, filename);
+
+    // move bad files into the "bad" directory
+    if ((dir = opendir(output_dir_path)) != NULL || mkdir(output_dir_path, 0777) == 0) {
+        if (rename(file_path, dest) == 0) {
+            printf("Bad file <%s> found. Moved to <%s> directory\n", filename, output_dir_path);
+        } else {
+            perror("Error moving file");
+        }
+
+        closedir(dir);
+    }
+}
