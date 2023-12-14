@@ -1,55 +1,43 @@
 #include "process.h"
 #include <dirent.h>
+#include <errno.h>
 
 struct HashMap* filePathMap;
 
-int createDirectory(const char *path) {
-    struct stat st;
-
-    // Check if the directory already exists
-    if (stat(path, &st) == -1)
-    {
-        // Directory doesn't exist, so create it
-        if (mkdir(path, 0777) != 0)
-        {
-            perror("Error creating directory");
-            return 1; // Return an error code
-        }
-    }
-
-    return 0; // Return success
+int create_directory(const char *path) {
+    return mkdir(path, 0777); // Using 0777 permission
 }
 
-int createDirectories(const char *path) {
-    char *pathCopy = strdup(path);
-    char *token = strtok(pathCopy, "/");
-    char currentPath[1024];
+// Recursive function to create directories
+void createDirectories(const char *path) {
+    char temp[1024];
+    strncpy(temp, path, sizeof(temp));
+    temp[sizeof(temp) - 1] = '\0';
 
-    strcpy(currentPath, token);
+    for (char *p = temp + 1; *p; p++) {
+        if (*p == '/') {
+            // Temporarily end the string here
+            *p = '\0';
 
-    while (token != NULL)
-    {
-        if (createDirectory(currentPath) != 0)
-        {
-            free(pathCopy);
-            return 1; // Return an error code
-        }
+            // Create the directory and check for error
+            if (create_directory(temp) != 0 && errno != EEXIST) {
+                perror("create_directory failed");
+                exit(EXIT_FAILURE);
+            }
 
-        token = strtok(NULL, "/");
-        if (token != NULL)
-        {
-            strcat(currentPath, "/");
-            strcat(currentPath, token);
+            // Restore the slash for the next iteration
+            *p = '/';
         }
     }
 
-    free(pathCopy);
-    return 0; // Return success
+    // Create the last directory in the path
+    if (create_directory(temp) != 0 && errno != EEXIST) {
+        perror("create_directory failed");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
-    // Print "Decompressing file: [filename], is_last: [is_last], size: [size]"
-
     // Initialize zlib decompression stream
     z_stream strm;
     strm.zalloc = Z_NULL;
@@ -60,13 +48,19 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
         return;
     }
 
-    // Allocate input and output buffers
-    unsigned char in[CHUNK_SIZE + 1000];
-    unsigned char out[CHUNK_SIZE + 1000];
-
     long remaining = header.size; // Remaining amount of compressed data
 
-    // Read and decompress data
+    // Dynamically allocate input and output buffers based on the chunk size
+    unsigned char *in = (unsigned char *)malloc(CHUNK_SIZE);
+    unsigned char *out = (unsigned char *)malloc(CHUNK_SIZE);
+    if (in == NULL || out == NULL) {
+        fprintf(stderr, "Memory allocation for buffers failed\n");
+        if (in != NULL) free(in);
+        if (out != NULL) free(out);
+        inflateEnd(&strm);
+        return;
+    }
+
     int ret;
     do {
         long to_read = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
@@ -77,21 +71,23 @@ void decompress_file(FILE *fp, FILE *out_fp, ChunkHeader header) {
         strm.next_in = in;
         remaining -= strm.avail_in;
 
-        // Decompress data to output buffer
         do {
             strm.avail_out = CHUNK_SIZE;
             strm.next_out = out;
             ret = inflate(&strm, Z_NO_FLUSH);
             if (ret != Z_OK && ret != Z_STREAM_END) {
-                inflateEnd(&strm);
                 fprintf(stderr, "Zlib decompression error: %d\n", ret);
-                return;
+                break;
             }
             size_t have = CHUNK_SIZE - strm.avail_out;
             fwrite(out, 1, have, out_fp);
-
         } while (strm.avail_out == 0);
+
     } while (ret != Z_STREAM_END && remaining > 0);
+
+    // Free the allocated memory
+    free(in);
+    free(out);
 
     // Clean up zlib stream
     inflateEnd(&strm);
@@ -166,6 +162,8 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         return;
     }
 
+    printf("ChunkHeader: filename: %s, size: %ld, is_last: %d\n", header.filename, header.size, header.is_last);
+
     char output_file_path[1024];
     snprintf(output_file_path, sizeof(output_file_path), "%s/%s", output_dir_path, header.filename);
 
@@ -205,11 +203,7 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
             }
 
             // create non-existing directories
-            if (createDirectories(fullPath) != 0) {
-                printf("Failed to create directories: %s\n", fullPath);
-                fclose(fp);
-                return;
-            }
+            createDirectories(fullPath);
 
             // get the target file
             snprintf(output_file_path, sizeof(output_file_path), "%s/%s", fullPath, header.filename);
@@ -224,7 +218,7 @@ void decompress_zwz(const char *file_path, const char *output_dir_path) {
         decompress_file(fp, out_fp, header);
         if (header.is_last == 1) {
             if (strcmp(header.filename, "sorted_files_by_size.txt") != 0) {
-                printf("Decompressing file: %s, is_last: %d, size: %d\n", header.filename, header.is_last, header.size);
+                printf("Decompressing file: %s, is_last: %d, size: %ld\n", header.filename, header.is_last, header.size);
                 // printf("Hash: %s\n", header.hash_value);
             }
             fclose(out_fp);
