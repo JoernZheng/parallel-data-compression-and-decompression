@@ -1,42 +1,58 @@
-#include <iostream>
+#include "process.h"
 #include <cstring>
+#include <filesystem>
+#include <iostream>
+#include <mpi.h>
+#include <stdexcept>
+#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <mpi.h>
-#include <string>
-#include <stdexcept>
-#include <filesystem>
+#include <vector>
 
-void _compress(const char *folder_path, const char *output_path) {
-//    int world_rank, world_size;
-//    char file_record_path[1024];
-//
-//    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-//    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-//
-//    // Step 1: Sort files by size and record them
-//    if (world_rank == 0) {
-//        cout << "Compressing folder: " << folder_path << endl;
-//        char *file_record = sort_files_by_size(folder_path);
-//        cout << "File record saved location: " << file_record << endl;
-//        strncpy(file_record_path, file_record, sizeof(file_record_path) - 1);
-//        file_record_path[sizeof(file_record_path) - 1] = '\0'; // Ensure null-terminated string
-//        free(file_record);
-//    }
-//
-//    // Step 2: Broadcast file_record_path to all processes
-//    MPI_Bcast(file_record_path, sizeof(file_record_path), MPI_CHAR, 0, MPI_COMM_WORLD);
-//
-//    int file_count = count_non_empty_lines(file_record_path);
-//
-//    // Step 3: Compress files
-//    if (world_rank < file_count) {
-//        do_compression(folder_path, output_path, file_record_path, world_rank);
-//    } else {
-//        cout << "Rank: " << world_rank << " - No file to compress" << endl;
-//    }
-//
-//    cout << "main.c - Rank: " << world_rank << " - do_compression finished" << endl;
+void _compress(const std::string &folder_path, const std::string &output_path) {
+    int world_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    std::string file_record;
+
+    // Step 1: Sort files by size and record them
+    if (world_rank == 0) {
+        std::cout << "Compressing folder: " << folder_path << std::endl;
+        file_record = sort_files_by_size(folder_path);
+        std::cout << "File record saved location: " << file_record << std::endl;
+    }
+
+    // Step 2: Broadcast file_record to all processes
+    // Broadcast the size of file_record to all processes
+    size_t buffer_size = file_record.size();
+    MPI_Bcast(&buffer_size, 1, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
+
+    // Resize the buffer on all processes
+    std::vector<char> broadcast_buffer(buffer_size + 1); // +1 for null terminator
+    if (world_rank == 0) {
+        std::strcpy(broadcast_buffer.data(), file_record.c_str());
+    }
+
+    MPI_Bcast(broadcast_buffer.data(), buffer_size + 1, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+    if (world_rank != 0) {
+        file_record = std::string(broadcast_buffer.data(), buffer_size);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    std::cout << "file_record: " << file_record << std::endl;
+
+    //    int file_count = count_non_empty_lines(file_record_path);
+
+    // Step 3: Compress files
+    //    if (world_rank < file_count) {
+    //        do_compression(folder_path, output_path, file_record_path, world_rank);
+    //    } else {
+    //        std::cout << "Rank: " << world_rank << " - No file to compress" << std::endl;
+    //    }
+    //
+    std::cout << "main.c - Rank: " << world_rank << " - do_compression finished" << std::endl;
 }
 //
 //void _decompress(const string &source_path, const string &output_path) {
@@ -69,7 +85,7 @@ void remove_trailing_slash(std::string &path) {
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
-    double start_time = MPI_Wtime(); // Start the timer
+    double start_time = MPI_Wtime();// Start the timer
 
     int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
@@ -123,7 +139,7 @@ int main(int argc, char *argv[]) {
 
     // Execute the specified operation
     if (operation == "compress") {
-         _compress(source_path, output_path);
+        _compress(source_path, output_path);
     } else if (operation == "decompress") {
         // _decompress(source_path, output_path);
     } else {
@@ -134,7 +150,7 @@ int main(int argc, char *argv[]) {
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    double end_time = MPI_Wtime(); // Stop the timer
+    double end_time = MPI_Wtime();// Stop the timer
 
     if (world_rank == 0) {
         double total_time = end_time - start_time;
