@@ -1,24 +1,28 @@
 #ifndef FINAL_DEMO_PROCESS_H
 #define FINAL_DEMO_PROCESS_H
 
+#include <fcntl.h>
 #include <mpi.h>
+#include <omp.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
-#include <zlib.h>
 #include <string.h>
-#include <semaphore.h>
-#include <fcntl.h>
 #include <sys/stat.h>
-#include <pthread.h>
+#include <zlib.h>
 //#include <openssl/md5.h>
 #include <dirent.h>
+#include <filesystem>// Include this for std::filesystem
 #include <string>
-#include <filesystem> // Include this for std::filesystem
+#include <iostream>
+#include <cstddef>
+#include <array>
 
-//#define CHUNK_SIZE 65535
+
+constexpr std::size_t CHUNK_SIZE = 65535;
 //#define QUEUE_SIZE 100
-//#define NUM_CONSUMERS 1
+#define NUM_CONSUMERS 1
 //
 //#define MAX_LINE_LENGTH 256
 //#define HASHMAP_INIT_SIZE 100
@@ -26,10 +30,20 @@
 //#define BUFFER_SIZE 1024
 
 
-//typedef struct {
-//    char *relpath;
-//    off_t size;
-//} FileEntry;
+struct FileEntry {
+    std::string relpath;// Relative path
+    off_t size;
+};
+
+struct Chunk {
+    int sequence_id;
+    std::string relative_path;
+    std::array<unsigned char, CHUNK_SIZE> data;
+    size_t size;
+    bool is_last_chunk;
+    bool is_last_file;
+};
+
 //
 //typedef struct {
 //    char filename[255];
@@ -38,15 +52,7 @@
 //    char hash_value[2 * MD5_DIGEST_LENGTH + 1]; // hash value of the file before compressed
 //} ChunkHeader;
 //
-//typedef struct {
-//    int id;
-//    char filename[255];
-//    unsigned char data[CHUNK_SIZE];
-//    size_t size;
-//    int is_last_chunk;
-//    int is_last_file;
-//    char full_path[1024];
-//} Chunk;
+
 //
 //typedef struct {
 //    char filename[255];
@@ -92,5 +98,7 @@
 //void destroyHashMap(struct HashMap *map);
 
 std::string sort_files_by_size(const std::filesystem::path &path);
+int count_non_empty_lines(const std::string &file_path);
+void do_compression(const std::string &input_dir, const std::string &output_dir, const std::string &file_record, int world_rank);
 
 #endif
