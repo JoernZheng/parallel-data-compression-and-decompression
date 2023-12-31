@@ -43,18 +43,18 @@ void _compress(const std::string &folder_path, const std::string &output_path) {
     MPI_Barrier(MPI_COMM_WORLD);
     std::cout << "file_record: " << file_record << std::endl;
 
-    //    int file_count = count_non_empty_lines(file_record_path);
+    int file_count = count_non_empty_lines(file_record);
 
     // Step 3: Compress files
-    //    if (world_rank < file_count) {
-    //        do_compression(folder_path, output_path, file_record_path, world_rank);
-    //    } else {
-    //        std::cout << "Rank: " << world_rank << " - No file to compress" << std::endl;
-    //    }
-    //
+        if (world_rank < file_count) {
+            do_compression(folder_path, output_path, file_record, world_rank);
+        } else {
+            std::cout << "Rank: " << world_rank << " - No file to compress" << std::endl;
+        }
+
     std::cout << "main.c - Rank: " << world_rank << " - do_compression finished" << std::endl;
 }
-//
+
 //void _decompress(const string &source_path, const string &output_path) {
 //    int world_rank, world_size;
 //    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);

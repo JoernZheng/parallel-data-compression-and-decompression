@@ -35,7 +35,7 @@ std::string sort_files_by_size(const std::filesystem::path &path) {
     std::ofstream file(output_filename);
     if (file.is_open()) {
         for (const auto &entry: files) {
-            file << entry.relpath << " (" << entry.size << " bytes)\n";
+            file << entry.relpath << "\n";
         }
     }
 
