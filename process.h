@@ -12,12 +12,12 @@
 #include <sys/stat.h>
 #include <zlib.h>
 //#include <openssl/md5.h>
+#include <array>
+#include <cstddef>
 #include <dirent.h>
 #include <filesystem>// Include this for std::filesystem
-#include <string>
 #include <iostream>
-#include <cstddef>
-#include <array>
+#include <string>
 
 
 constexpr std::size_t CHUNK_SIZE = 65535;
@@ -44,22 +44,26 @@ struct Chunk {
     bool is_last_file;
 };
 
-//
+
 //typedef struct {
 //    char filename[255];
 //    long size;    // Size of the compressed chunk
 //    int is_last;    // If this is the last chunk of the file
 //    char hash_value[2 * MD5_DIGEST_LENGTH + 1]; // hash value of the file before compressed
 //} ChunkHeader;
-//
+
+//struct ChunkHeader {
+//    long size;
+//};
+
 
 //
-//typedef struct {
-//    char filename[255];
-//    unsigned char content[CHUNK_SIZE];
-//    size_t size;
-//    int written; // 0: not written, 1: written
-//} CompressedChunk;
+struct CompressedChunk {
+    std::string relative_path;
+    int sequence_id;
+    bool is_last_chunk;
+    std::array<unsigned char, CHUNK_SIZE> data;
+};
 
 /*
     Decompress Define
