@@ -55,22 +55,22 @@ void _compress(const std::string &folder_path, const std::string &output_path) {
     std::cout << "main.c - Rank: " << world_rank << " - do_compression finished" << std::endl;
 }
 
-//void _decompress(const string &source_path, const string &output_path) {
-//    int world_rank, world_size;
-//    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-//    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-//
-//    if (world_rank == 0) {
-//        if (world_size > 1) {
-//            cout << "Decompression is not supported in MPI parallel mode.\n";
-//            cout << "Only use one process to decompress.\n";
-//            cout << "Decompression uses multiple threads to parallel decompress files.\n";
-//        }
-//
-//        do_decompression(source_path, output_path);// Assuming this function is converted to C++
-//    }
-//}
-//
+void _decompress(const std::string &source_path, const std::string &output_path) {
+    int world_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    if (world_rank == 0) {
+        if (world_size > 1) {
+            std::cout << "Decompression is not supported in MPI parallel mode.\n";
+            std::cout << "Only use one process to decompress.\n";
+            std::cout << "Decompression uses multiple threads to parallel decompress files.\n";
+        }
+
+        do_decompression(source_path, output_path);
+    }
+}
+
 
 bool is_directory_empty(const std::string &path) {
     return std::filesystem::is_empty(path);
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
     if (operation == "compress") {
         _compress(source_path, output_path);
     } else if (operation == "decompress") {
-        // _decompress(source_path, output_path);
+        _decompress(source_path, output_path);
     } else {
         std::cerr << "Invalid operation: " << operation << ". Please use 'compress' or 'decompress'.\n";
         MPI_Abort(MPI_COMM_WORLD, 1);
