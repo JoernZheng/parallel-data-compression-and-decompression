@@ -1,0 +1,152 @@
+#include "process.h"
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <queue>
+#include <string>
+#include <vector>
+#include <zlib.h>
+
+void decompress_chunk(CompressedChunk &chunk, std::ostream &dest) {
+    if (chunk.data.empty()) {
+        return;
+    }
+
+    z_stream strm;
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    if (inflateInit(&strm) != Z_OK) {
+        return;
+    }
+
+    strm.avail_in = chunk.data.size();
+    strm.next_in = reinterpret_cast<Bytef*>(chunk.data.data());
+
+    unsigned char out[CHUNK_SIZE];
+    do {
+        strm.avail_out = sizeof(out);
+        strm.next_out = out;
+        inflate(&strm, Z_NO_FLUSH);
+
+        dest.write(reinterpret_cast<char *>(out), sizeof(out) - strm.avail_out);
+    } while (strm.avail_out == 0);
+
+    inflateEnd(&strm);
+}
+
+struct CompareChunks {
+    bool operator()(const CompressedChunk &a, const CompressedChunk &b) {
+        return a.sequence_id > b.sequence_id;
+    }
+};
+
+void decompress_zwz(const std::string &filename, const std::string &output_dir) {
+    std::ifstream source(filename, std::ios::binary);
+    if (!source.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    std::map<std::string, std::priority_queue<CompressedChunk, std::vector<CompressedChunk>, CompareChunks>> pending_chunks;
+    std::map<std::string, int> expected_sequence_id;
+    std::map<std::string, std::ofstream> output_files;
+
+    auto remove_file_info = [&](const std::string &relative_path) {
+        output_files[relative_path].close();
+        output_files.erase(relative_path);
+        expected_sequence_id.erase(relative_path);
+        pending_chunks.erase(relative_path);
+    };
+
+    while (!source.eof()) {
+        int total_size;
+        source.read(reinterpret_cast<char *>(&total_size), sizeof(total_size));
+        if (source.eof()) break;// 防止处理空块
+
+        int path_length;
+        source.read(reinterpret_cast<char *>(&path_length), sizeof(path_length));
+
+        std::string relative_path(path_length, '\0');
+        source.read(&relative_path[0], path_length);
+
+        int sequence_id;
+        source.read(reinterpret_cast<char *>(&sequence_id), sizeof(sequence_id));
+
+        bool is_last_chunk;
+        source.read(reinterpret_cast<char *>(&is_last_chunk), sizeof(is_last_chunk));
+
+        std::vector<unsigned char> compressed_data(total_size - (sizeof(path_length) + path_length + sizeof(sequence_id) + sizeof(is_last_chunk)));
+        source.read(reinterpret_cast<char *>(compressed_data.data()), compressed_data.size());
+
+        // 打开对应的输出文件，如果尚未打开
+        if (output_files.find(relative_path) == output_files.end()) {
+            std::string file_path = output_dir + "/" + relative_path;
+
+            // 创建文件路径中的目录（如果它们不存在）
+            std::filesystem::path dir = std::filesystem::path(file_path).parent_path();
+            if (!std::filesystem::exists(dir)) {
+                std::filesystem::create_directories(dir); // 创建缺失的目录
+            }
+
+            output_files[relative_path].open(file_path, std::ios::binary);
+            if (!output_files[relative_path].is_open()) {
+                std::cerr << "Error creating output file: " << file_path << std::endl;
+                continue;
+            }
+            expected_sequence_id[relative_path] = 0;
+        }
+
+        CompressedChunk chunk;
+        chunk.relative_path = relative_path;
+        chunk.sequence_id = sequence_id;
+        chunk.is_last_chunk = is_last_chunk;
+        std::copy(compressed_data.begin(), compressed_data.end(), chunk.data.begin());
+
+        // 如果这是下一个期望的块，则立即处理它
+        if (expected_sequence_id[relative_path] == sequence_id) {
+            decompress_chunk(chunk, output_files[relative_path]);
+            expected_sequence_id[relative_path]++;
+
+            // 检查是否有等待中的块可以处理
+            while (!pending_chunks[relative_path].empty() &&
+                   pending_chunks[relative_path].top().sequence_id == expected_sequence_id[relative_path]) {
+                CompressedChunk next_chunk = pending_chunks[relative_path].top();
+                pending_chunks[relative_path].pop();
+                decompress_chunk(next_chunk, output_files[relative_path]);
+                expected_sequence_id[relative_path]++;
+            }
+
+            if (is_last_chunk && expected_sequence_id[relative_path] == sequence_id + 1 && pending_chunks[relative_path].empty()) {
+                remove_file_info(relative_path);
+            }
+        } else {
+            // 否则，将块加入等待队列
+            pending_chunks[relative_path].push(chunk);
+        }
+    }
+
+    // 处理剩余的文件
+    for (auto &pair: output_files) {
+        if (!pending_chunks[pair.first].empty()) {
+            std::cerr << "Warning: pending chunks remaining for file: " << pair.first << std::endl;
+        }
+        pair.second.close();
+    }
+}
+
+void do_decompression(const std::string &input_dir, const std::string &output_dir) {
+    std::vector<std::string> files;
+
+    for (const auto &entry : std::filesystem::directory_iterator(input_dir)) {
+        if (entry.path().extension() == ".zwz") {
+            files.push_back(entry.path());
+        }
+    }
+
+    #pragma omp parallel for num_threads(omp_get_num_procs() * 2)
+    for (size_t i = 0; i < files.size(); ++i) {
+        decompress_zwz(files[i], output_dir);
+    }
+}
