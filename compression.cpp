@@ -1,5 +1,5 @@
-#include "concurrence_queue.h"
-#include "process.h"
+#include "concurrence_queue.hpp"
+#include "process.hpp"
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +19,7 @@ ConcurrenceQueue<Chunk> queue;
 bool consumer_task_finished = false;
 int processed_chunk_count = 0;
 std::mutex write_lock;
+std::string input_path_prefix;
 
 void producer(const std::string &input_dir, const std::string &file_record, int world_rank) {
     std::ifstream record_file(file_record);
@@ -90,6 +91,16 @@ void data_writer(const Chunk *chunk, long compressed_size, const unsigned char *
 
     // Write the compressed data
     dest.write(reinterpret_cast<const char *>(compressed_data), compressed_size);
+
+    if (chunk->is_last_chunk) {
+        std::string md5_value;
+        std::filesystem::path full_path = std::filesystem::path(input_path_prefix) / chunk->relative_path;
+        md5_value = md5_of_file(full_path);
+
+        std::cout << "md5 value size: " << md5_value.size() << std::endl;
+
+        dest.write(md5_value.c_str(), md5_value.size());
+    }
 }
 
 void consumer(std::ofstream &dest) {
@@ -157,7 +168,7 @@ void do_compression(const std::string &input_dir, const std::string &output_dir,
 
     std::string output_filename = generate_output_filename(output_dir, world_rank);
     std::ofstream dest(output_filename, std::ios::binary);
-    //    write_file_record_to_dest(file_record, dest);
+    input_path_prefix = input_dir;
 
     std::cout << "Max record line num: " << max_record_line_num << std::endl;
 

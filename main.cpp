@@ -1,15 +1,13 @@
-#include "process.h"
+#include "process.hpp"
 #include <cstring>
-#include <filesystem>
 #include <iostream>
 #include <mpi.h>
 #include <stdexcept>
 #include <string>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <vector>
 
-void _compress(const std::string &folder_path, const std::string &output_path) {
+void compress(const std::string &folder_path, const std::string &output_path) {
     int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -55,7 +53,7 @@ void _compress(const std::string &folder_path, const std::string &output_path) {
     std::cout << "main.c - Rank: " << world_rank << " - do_compression finished" << std::endl;
 }
 
-void _decompress(const std::string &source_path, const std::string &output_path) {
+void decompress(const std::string &source_path, const std::string &output_path) {
     int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -69,11 +67,6 @@ void _decompress(const std::string &source_path, const std::string &output_path)
 
         do_decompression(source_path, output_path);
     }
-}
-
-
-bool is_directory_empty(const std::string &path) {
-    return std::filesystem::is_empty(path);
 }
 
 void remove_trailing_slash(std::string &path) {
@@ -111,7 +104,7 @@ int main(int argc, char *argv[]) {
 
     // Master node checks and prepares paths
     if (world_rank == 0) {
-        struct stat path_stat;
+        struct stat path_stat{};
 
         // Check if source path exists
         if (stat(source_path.c_str(), &path_stat) != 0) {
@@ -139,9 +132,9 @@ int main(int argc, char *argv[]) {
 
     // Execute the specified operation
     if (operation == "compress") {
-        _compress(source_path, output_path);
+        compress(source_path, output_path);
     } else if (operation == "decompress") {
-        _decompress(source_path, output_path);
+        decompress(source_path, output_path);
     } else {
         std::cerr << "Invalid operation: " << operation << ". Please use 'compress' or 'decompress'.\n";
         MPI_Abort(MPI_COMM_WORLD, 1);
