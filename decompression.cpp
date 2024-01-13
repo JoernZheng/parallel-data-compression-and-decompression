@@ -1,4 +1,4 @@
-#include "process.h"
+#include "process.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -52,18 +52,20 @@ void decompress_zwz(const std::string &filename, const std::string &output_dir) 
     std::map<std::string, std::priority_queue<CompressedChunk, std::vector<CompressedChunk>, CompareChunks>> pending_chunks;
     std::map<std::string, int> expected_sequence_id;
     std::map<std::string, std::ofstream> output_files;
+    std::map<std::string, std::string> file_md5s;
 
     auto remove_file_info = [&](const std::string &relative_path) {
         output_files[relative_path].close();
         output_files.erase(relative_path);
         expected_sequence_id.erase(relative_path);
         pending_chunks.erase(relative_path);
+        file_md5s.erase(relative_path);
     };
 
     while (!source.eof()) {
         int total_size;
         source.read(reinterpret_cast<char *>(&total_size), sizeof(total_size));
-        if (source.eof()) break;// 防止处理空块
+        if (source.eof()) break;    // End of file
 
         int path_length;
         source.read(reinterpret_cast<char *>(&path_length), sizeof(path_length));
@@ -77,17 +79,26 @@ void decompress_zwz(const std::string &filename, const std::string &output_dir) 
         bool is_last_chunk;
         source.read(reinterpret_cast<char *>(&is_last_chunk), sizeof(is_last_chunk));
 
-        std::vector<unsigned char> compressed_data(total_size - (sizeof(path_length) + path_length + sizeof(sequence_id) + sizeof(is_last_chunk)));
+        int compressed_data_size = total_size - (sizeof(path_length) + path_length + sizeof(sequence_id) + sizeof(is_last_chunk));
+        std::vector<unsigned char> compressed_data(compressed_data_size);
         source.read(reinterpret_cast<char *>(compressed_data.data()), compressed_data.size());
 
-        // 打开对应的输出文件，如果尚未打开
+        if (is_last_chunk) {
+            std::string stored_md5(MD5_DATA_SIZE, '\0');
+            source.read(&stored_md5[0], MD5_DATA_SIZE);
+
+            std::cout << "Read MD5: " << stored_md5 << std::endl;
+            file_md5s[relative_path] = stored_md5;
+        }
+
+        // Open the corresponding output file if not opened yet
         if (output_files.find(relative_path) == output_files.end()) {
             std::string file_path = output_dir + "/" + relative_path;
 
-            // 创建文件路径中的目录（如果它们不存在）
+            // Create the directories in the file path if they don't exist
             std::filesystem::path dir = std::filesystem::path(file_path).parent_path();
             if (!std::filesystem::exists(dir)) {
-                std::filesystem::create_directories(dir); // 创建缺失的目录
+                std::filesystem::create_directories(dir); // Create the directories
             }
 
             output_files[relative_path].open(file_path, std::ios::binary);
@@ -104,12 +115,12 @@ void decompress_zwz(const std::string &filename, const std::string &output_dir) 
         chunk.is_last_chunk = is_last_chunk;
         std::copy(compressed_data.begin(), compressed_data.end(), chunk.data.begin());
 
-        // 如果这是下一个期望的块，则立即处理它
+        // If this is the next expected chunk, process it immediately
         if (expected_sequence_id[relative_path] == sequence_id) {
             decompress_chunk(chunk, output_files[relative_path]);
             expected_sequence_id[relative_path]++;
 
-            // 检查是否有等待中的块可以处理
+            // Check if there are pending chunks that can be processed
             while (!pending_chunks[relative_path].empty() &&
                    pending_chunks[relative_path].top().sequence_id == expected_sequence_id[relative_path]) {
                 CompressedChunk next_chunk = pending_chunks[relative_path].top();
@@ -119,15 +130,30 @@ void decompress_zwz(const std::string &filename, const std::string &output_dir) 
             }
 
             if (is_last_chunk && expected_sequence_id[relative_path] == sequence_id + 1 && pending_chunks[relative_path].empty()) {
+                std::string file_path = output_dir + "/" + relative_path;
+                output_files[relative_path].close();
+
+                std::string calculated_md5 = md5_of_file(file_path);
+                std::string stored_md5 = file_md5s[relative_path];
+
+                // Compare the calculated MD5 with the stored MD5
+                if (calculated_md5 != stored_md5) {
+                    std::cerr << "MD5 mismatch for file: " << file_path << std::endl;
+                    std::cout << "Expected MD5: " << stored_md5 << std::endl;
+                    std::cout << "Calculated MD5: " << calculated_md5 << std::endl;
+                } else {
+                    std::cout << "MD5 match for file: " << file_path << std::endl;
+                }
+
                 remove_file_info(relative_path);
             }
         } else {
-            // 否则，将块加入等待队列
+            // Else, add the chunk to the waiting queue
             pending_chunks[relative_path].push(chunk);
         }
     }
 
-    // 处理剩余的文件
+    // Deal with remaining files
     for (auto &pair: output_files) {
         if (!pending_chunks[pair.first].empty()) {
             std::cerr << "Warning: pending chunks remaining for file: " << pair.first << std::endl;
@@ -146,7 +172,7 @@ void do_decompression(const std::string &input_dir, const std::string &output_di
     }
 
     #pragma omp parallel for num_threads(omp_get_num_procs() * 2)
-    for (size_t i = 0; i < files.size(); ++i) {
-        decompress_zwz(files[i], output_dir);
+    for (const auto & file : files) {
+        decompress_zwz(file, output_dir);
     }
 }
